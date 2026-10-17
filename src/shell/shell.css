@@ -119,3 +119,4 @@
 .desktop-drag-image { position: absolute; opacity: .5; pointer-events: none; color: white; text-align: center; z-index: 2; }
 .desktop-drag-image img,.desktop-drag-image .icon-fallback { display: block; width: 48px; height: 48px; margin: 8px auto 3px; object-fit: contain; }
 .desktop-drag-image > span { text-shadow: 1px 1px 2px black; }
+.desktop-drag-image > div > img,.desktop-drag-image > div > .icon-fallback { width: 100%; height: 100%; margin: 0; }

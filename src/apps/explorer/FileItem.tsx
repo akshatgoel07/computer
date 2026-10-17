@@ -23,7 +23,7 @@ export function RenameInput({ item, finish }: { item: Item; finish: () => void }
     const extension = node.kind === 'file' ? node.name.slice(displayName(node).length) : ''
     const result = useFilesStore.getState().commit({ kind: 'rename', id: node.id, name: value + extension })
     if (result.ok) { done.current = true; finish() }
-    else if (result.error === 'quota') showError(result.error)
+    else if (result.error === 'quota') { done.current = true; finish(); showError(result.error) }
     else { setInvalid(true); void play('ding'); input.current?.focus(); input.current?.select() }
   }
   return <input className="rename-input" ref={input} aria-label="File name" aria-invalid={invalid} title={invalid ? 'Enter a valid name that differs from other items.' : undefined} value={value} onChange={event => { setValue(event.target.value); setInvalid(false) }} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onBlur={commit} onKeyDown={event => {

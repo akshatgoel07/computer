@@ -25,6 +25,8 @@ export default function Explorer({ windowId }: { windowId: string }) {
   const [paneWidth, setPaneWidth] = useState(182)
   const [menuBar, setMenuBar] = useState(false)
   const [query, setQuery] = useState('')
+  const priorQuery = useRef('')
+  const priorSelection = useRef<string[]>([])
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null)
   useEffect(() => { const timer = setTimeout(() => setQuery(session?.query ?? ''), 200); return () => clearTimeout(timer) }, [session?.query])
   useEffect(() => {
@@ -33,9 +35,12 @@ export default function Explorer({ windowId }: { windowId: string }) {
   }, [files, session, windowId])
   useEffect(() => {
     if (!session) return
+    if (session.query && !priorQuery.current) priorSelection.current = [...session.selection]
+    const candidates = !session.query && priorQuery.current ? priorSelection.current : session.selection
+    priorQuery.current = session.query
     const visible = new Set(itemsAt(files, session.location, recent).map(item => item.id))
-    const selection = session.selection.filter(id => visible.has(id))
-    if (selection.length !== session.selection.length) useExplorerStore.getState().patch(windowId, { selection })
+    const selection = candidates.filter(id => visible.has(id) || session.query && files.nodes[id as keyof typeof files.nodes] && !inBin(files, files.nodes[id as keyof typeof files.nodes].id))
+    if (JSON.stringify(selection) !== JSON.stringify(session.selection)) useExplorerStore.getState().patch(windowId, { selection })
   }, [files.nodes, files.bin, session, recent, windowId])
   if (!session) return null
   const bin = session.location.kind === 'shell' && session.location.name === 'bin'
@@ -66,7 +71,10 @@ export default function Explorer({ windowId }: { windowId: string }) {
     if (result.value) { useExplorerStore.getState().patch(windowId, { selection: [result.value], anchor: result.value }); setRenameId(result.value); setTimeout(() => panel.current?.querySelector('.rename-input')?.scrollIntoView({ block: 'nearest' }), 0) }
   }
   const rename = () => { if (selected.length === 1 && selected[0].node && !selected[0].node.protected && !bin) setRenameId(selected[0].id); else void play('ding') }
-  const remove = (permanent = false) => requestDelete(selected.flatMap(item => item.node ? [item.node.id] : []), permanent || bin)
+  const remove = (permanent = false) => {
+    if (selected.some(item => !item.node || item.node.protected)) { void play('ding'); return }
+    requestDelete(selected.flatMap(item => item.node ? [item.node.id] : []), permanent || bin)
+  }
   const activate = (item: Item) => {
     if (bin && item.node) { useFileDialog.getState().show({ kind: 'error', title: `${item.node.name} Properties`, text: `${item.node.name}\n${typeName(item.node)}`, icon: item.node.icon }); return }
     if (item.location) useExplorerStore.getState().navigate(windowId, item.location)

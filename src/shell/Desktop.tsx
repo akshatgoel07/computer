@@ -32,6 +32,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
   const drag = useRef<{ id: string; x: number; y: number; ids: string[]; positions: Record<string, { x: number; y: number }>; moved: boolean } | null>(null)
   const rubber = useRef<{ x: number; y: number; initial: string[]; ctrl: boolean } | null>(null)
   const suppressClick = useRef(false)
+  const anchor = useRef<string | null>(null)
   const closeMenu = useCallback(() => setMenu(null), [])
   useEffect(() => {
     const resize = () => setViewport({ width: innerWidth, height: innerHeight - 40 })
@@ -70,7 +71,10 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     if (selection.length === 1 && item?.node && !item.node.protected) setRenameId(item.id)
     else void play('ding')
   }
-  const remove = (permanent = false) => requestDelete(selection.flatMap(id => files.nodes[nodeId(id)] ? [nodeId(id)] : []), permanent)
+  const remove = (permanent = false) => {
+    if (selection.some(id => !files.nodes[nodeId(id)] || files.nodes[nodeId(id)].protected)) { void play('ding'); return }
+    requestDelete(selection.map(nodeId), permanent)
+  }
   const context = (event: React.MouseEvent, item?: Item) => {
     event.preventDefault(); event.stopPropagation()
     const selected = item && !selection.includes(item.id) ? [item.id] : selection
@@ -91,7 +95,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
       else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { event.preventDefault(); createFolder() }
       else if (event.key === 'Escape') { setMenu(null); drag.current = null; rubber.current = null; setDraft({}); setRectangle(null) }
       else if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const item = items.find(item => item.id === selection[0]); const point = item ? positions[item.id] : { x: 0, y: 0 }; context({ preventDefault() {}, stopPropagation() {}, clientX: point.x + 20, clientY: point.y + 30 } as React.MouseEvent, item) }
-      else if (event.key.startsWith('Arrow')) { event.preventDefault(); const index = Math.max(0, items.findIndex(item => item.id === selection.at(-1))); const delta = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : event.key === 'ArrowRight' ? rows : -rows; const item = items[Math.max(0, Math.min(items.length - 1, index + delta))]; if (item) setSelection(event.shiftKey ? [...new Set([...selection, item.id])] : event.ctrlKey ? selection : [item.id]) }
+      else if (event.key.startsWith('Arrow')) { event.preventDefault(); const focused = document.activeElement instanceof HTMLElement ? document.activeElement.closest('[data-item-id]')?.getAttribute('data-item-id') : null; const index = Math.max(0, items.findIndex(item => item.id === (focused ?? selection.at(-1)))); const delta = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : event.key === 'ArrowRight' ? rows : -rows; const item = items[Math.max(0, Math.min(items.length - 1, index + delta))]; if (item) { grid.current?.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`)?.focus(); if (!event.ctrlKey) { const a = Math.max(0, items.findIndex(value => value.id === anchor.current)); const b = items.findIndex(value => value.id === item.id); setSelection(event.shiftKey ? items.slice(Math.min(a, b), Math.max(a, b) + 1).map(value => value.id) : [item.id]); if (!event.shiftKey) anchor.current = item.id } } }
     }} onPointerDown={event => {
       if (event.button !== 0 || event.target !== event.currentTarget) return
       grid.current?.focus(); setSelection(event.ctrlKey ? selection : []); useShellStore.getState().setStart(false)
@@ -102,6 +106,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
       if (start) {
         const dx = event.clientX - start.x; const dy = event.clientY - start.y
         if (!start.moved && Math.hypot(dx, dy) < 4) return
+        if (!start.moved) setSelection(start.ids)
         start.moved = true
         setDraft(Object.fromEntries(start.ids.map(id => [id, { x: Math.max(0, Math.min(viewport.width - width, start.positions[id].x + dx)), y: Math.max(0, Math.min(viewport.height - height, start.positions[id].y + dy)) }])))
       }
@@ -136,14 +141,15 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     }} onPointerCancel={() => { drag.current = null; rubber.current = null; setRectangle(null); setDraft({}) }}>
       {preferences.show && items.map(item => <DesktopIcon key={item.id} item={item} selected={selection.includes(item.id)} position={positions[item.id]} size={preferences.size} rename={renameId === item.id} finishRename={() => { setRenameId(null); grid.current?.focus() }} dragging={false} onClick={event => {
         if (suppressClick.current) { suppressClick.current = false; return }
-        setSelection(event.ctrlKey || event.metaKey ? selection.includes(item.id) ? selection.filter(id => id !== item.id) : [...selection, item.id] : event.shiftKey ? [...new Set([...selection, item.id])] : [item.id])
+        const a = Math.max(0, items.findIndex(value => value.id === anchor.current)); const b = items.findIndex(value => value.id === item.id)
+        setSelection(event.shiftKey ? [...new Set([...(event.ctrlKey ? selection : []), ...items.slice(Math.min(a, b), Math.max(a, b) + 1).map(value => value.id)])] : event.ctrlKey || event.metaKey ? selection.includes(item.id) ? selection.filter(id => id !== item.id) : [...selection, item.id] : [item.id])
+        if (!event.shiftKey) anchor.current = item.id
       }} onDoubleClick={() => activate(item)} onContextMenu={event => context(event, item)} onPointerDown={event => {
         if (event.button !== 0 || renameId || event.target instanceof HTMLInputElement) return
         const ids = selection.includes(item.id) ? selection : [item.id]
-        if (!selection.includes(item.id)) setSelection(ids)
         drag.current = { id: item.id, x: event.clientX, y: event.clientY, ids, positions, moved: false }
         event.currentTarget.setPointerCapture(event.pointerId)
-      }} />)}{items.filter(item => draft[item.id]).map(item => <div className="desktop-drag-image" key={`drag-${item.id}`} style={{ left: draft[item.id].x, top: draft[item.id].y, width, height }}><ItemImage item={item} /><span>{item.name}</span></div>)}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}
+      }} />)}{items.filter(item => draft[item.id]).map(item => <div className="desktop-drag-image" key={`drag-${item.id}`} style={{ left: draft[item.id].x, top: draft[item.id].y, width, height }}><div style={{ width: preferences.size === 'large' ? 96 : preferences.size === 'small' ? 32 : 48, height: preferences.size === 'large' ? 96 : preferences.size === 'small' ? 32 : 48, margin: '8px auto 3px' }}><ItemImage item={item} /></div><span>{item.name}</span></div>)}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}
     </div>
     {order.map((id, index) => { const record = windows[id]; return record ? <WindowFrame key={id} record={record} zIndex={100 + index} peek={peek} /> : null })}
     <Taskbar onPeek={setPeek} /><StartMenu />{menu && <ContextMenu {...menu} close={closeMenu} />}
