@@ -1,16 +1,25 @@
 import { create } from 'zustand'
 import { pinned, type AppId } from '@/lib/apps'
+import { readPreference, savePreference } from '@/fs/storage'
 import { play } from '@/lib/sound'
 
 export type Session = 'idle' | 'boot' | 'desktop' | 'shutdown' | 'restart' | 'logoff' | 'welcome' | 'locked'
 export type PowerAction = 'Switch user' | 'Log off' | 'Lock' | 'Restart' | 'Sleep' | 'Shut down'
 
+type DesktopPreferences = { cells: Record<string, { x: number; y: number }>; size: 'large' | 'medium' | 'small'; align: boolean; auto: boolean; show: boolean; sort: string }
+const initialDesktop: DesktopPreferences = { cells: {}, size: 'medium', align: true, auto: false, show: true, sort: 'Name' }
+const validDesktop = (value: unknown): value is DesktopPreferences => {
+  if (!value || typeof value !== 'object' || !('cells' in value) || !value.cells || typeof value.cells !== 'object') return false
+  if (!('size' in value) || !['large', 'medium', 'small'].includes(String(value.size)) || !('align' in value) || typeof value.align !== 'boolean' || !('auto' in value) || typeof value.auto !== 'boolean' || !('show' in value) || typeof value.show !== 'boolean' || !('sort' in value) || typeof value.sort !== 'string') return false
+  return Object.values(value.cells).every(cell => cell && typeof cell === 'object' && 'x' in cell && typeof cell.x === 'number' && Number.isFinite(cell.x) && cell.x >= 0 && 'y' in cell && typeof cell.y === 'number' && Number.isFinite(cell.y) && cell.y >= 0)
+}
 type ShellStore = {
+  desktop: DesktopPreferences
+  setDesktop: (patch: Partial<DesktopPreferences>) => void
   session: Session
   startOpen: boolean
   selectedIcon: AppId | null
   recent: AppId[]
-  binCount: number
   setSession: (session: Session) => void
   setStart: (open: boolean) => void
   selectIcon: (id: AppId | null) => void
@@ -19,7 +28,9 @@ type ShellStore = {
 }
 
 export const useShellStore = create<ShellStore>((set) => ({
-  session: 'idle', startOpen: false, selectedIcon: null, recent: [], binCount: 0,
+  desktop: readPreference('computer.desktop.v1', initialDesktop, validDesktop),
+  setDesktop: patch => set(state => { const desktop = { ...state.desktop, ...patch }; savePreference('computer.desktop.v1', desktop); return { desktop } }),
+  session: 'idle', startOpen: false, selectedIcon: null, recent: [],
   setSession: session => set({ session, startOpen: false }),
   setStart: startOpen => set({ startOpen }),
   selectIcon: selectedIcon => set({ selectedIcon }),
