@@ -63,6 +63,8 @@ export const icons = {
   notepad: '/icons/apps/notepad.webp',
   photoViewer: '/icons/apps/photo-viewer.webp',
   mediaPlayer: '/icons/apps/media-player.webp',
+  internetExplorer: '/icons/apps/internet-explorer.webp',
+  explorer: '/icons/apps/explorer.webp',
   error: '/icons/explorer/error.webp',
   refresh: '/icons/explorer/refresh.webp',
   search: '/icons/explorer/search.webp',
