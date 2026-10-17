@@ -1,9 +1,9 @@
-import { media } from '@/assets'
 import { nodeId, type Snapshot, type Template } from '@/fs/types'
 export const rootId = nodeId('c')
 export const userId = nodeId('akshat')
 export const desktopId = nodeId('akshat-desktop')
 export const libraries = ['documents', 'music', 'pictures', 'videos'] as const
+const metadata: Record<string, { bytes: number; modifiedAt: number }> = {"sampleChrysanthemum":{"bytes":110749,"modifiedAt":1792258450987},"sampleDesert":{"bytes":112735,"modifiedAt":1792258450989},"sampleHydrangeas":{"bytes":82261,"modifiedAt":1792258450992},"sampleJellyfish":{"bytes":55938,"modifiedAt":1792258450993},"sampleKoala":{"bytes":117800,"modifiedAt":1792258450994},"sampleLighthouse":{"bytes":85334,"modifiedAt":1792258450995},"samplePenguins":{"bytes":98933,"modifiedAt":1792258450996},"sampleTulips":{"bytes":79488,"modifiedAt":1792258450997},"kalimba":{"bytes":2785550,"modifiedAt":1792258451017},"maid":{"bytes":1358688,"modifiedAt":1792258451030},"sleepAway":{"bytes":1605349,"modifiedAt":1792258451041}}
 export function seed(): Snapshot {
   const state: Snapshot = { version: 1, nodes: {}, bin: {} }
   const folder = (id: string, parent: string | null, name: string, protect = true, template: Template = 'general') => {
@@ -45,16 +45,16 @@ export function seed(): Snapshot {
     const id = nodeId(`audio-${key}`)
     state.nodes[id] = { id, parentId: nodeId('sample-music'), name: `${name}.mp3`, kind: 'file', bytes: 0, payload: { kind: 'audio', key }, icon: 'audioFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
   }
-  const wildlife = Object.keys(media).find((key): key is keyof typeof media => key === 'wildlife')
-  if (wildlife) {
-    const id = nodeId('video-wildlife')
-    state.nodes[id] = { id, parentId: nodeId('sample-videos'), name: 'Wildlife.wmv', kind: 'file', bytes: 0, payload: { kind: 'video', key: wildlife }, icon: 'videoFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
-  }
+  const videoId = nodeId('video-wildlife')
+  state.nodes[videoId] = { id: videoId, parentId: nodeId('sample-videos'), name: 'Wildlife.wmv', kind: 'file', bytes: 0, payload: { kind: 'video' }, icon: 'videoFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
   folder('windows', 'c', 'Windows')
   folder('system32', 'windows', 'System32')
   folder('web', 'windows', 'Web')
   folder('wallpaper', 'web', 'Wallpaper')
   state.nodes[rootId].icon = 'driveLocal'
   state.nodes[userId].icon = 'userFolder'
+  for (const node of Object.values(state.nodes)) {
+    if (node.kind === 'file' && (node.payload.kind === 'audio' || node.payload.kind === 'image')) { const entry = metadata[node.payload.key]; if (entry) { node.bytes = entry.bytes; node.modifiedAt = entry.modifiedAt } }
+  }
   return state
 }

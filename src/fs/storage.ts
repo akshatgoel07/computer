@@ -32,8 +32,9 @@ export function parseSnapshot(value: unknown): Snapshot | null {
       if (!finite(node.bytes) || !object(payload)) return null
       if (payload.kind === 'text') { if (typeof payload.text !== 'string') return null }
       else if (payload.kind === 'image') { if (typeof payload.key !== 'string' || !(Object.hasOwn(images, payload.key))) return null }
+      else if (payload.kind === 'video' && payload.key === undefined) {}
       else if (payload.kind === 'audio' || payload.kind === 'video') { if (typeof payload.key !== 'string' || !(Object.hasOwn(media, payload.key))) return null }
-      else if (payload.kind === 'shortcut') { if (!location(payload.target) || (payload.target.kind === 'folder' && !nodes[payload.target.id])) return null }
+      else if (payload.kind === 'shortcut') { const target = payload.target; if (object(target) && target.kind === 'file') { if (typeof target.id !== 'string' || !object(nodes[target.id])) return null } else if (!location(target) || (target.kind === 'folder' && !nodes[target.id])) return null }
       else return null
     } else return null
     const seen = new Set<string>([id])

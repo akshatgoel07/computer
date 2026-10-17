@@ -1,7 +1,8 @@
 import { ancestors, inBin, pathFor, validName } from '@/fs/paths'
 import { rootId } from '@/fs/seed'
-import { failure, nodeId, success, type NodeId, type Result, type Snapshot } from '@/fs/types'
-export type Operation = { kind: 'createFolder'; parent: NodeId; name?: string } | { kind: 'rename'; id: NodeId; name: string } | { kind: 'delete'; ids: NodeId[]; permanent: boolean; now: number } | { kind: 'restore'; ids: NodeId[]; conflict: 'fail' | 'keepBoth' } | { kind: 'empty' } | { kind: 'move' | 'copy'; ids: NodeId[]; parent: NodeId }
+import { failure, nodeId, success, type IconKey, type Location, type NodeId, type Result, type Snapshot } from '@/fs/types'
+type ShortcutTarget = Location | { kind: 'file'; id: NodeId }
+export type Operation = { kind: 'createText'; parent: NodeId; name?: string; text?: string } | { kind: 'writeText'; id: NodeId; text: string } | { kind: 'shortcuts'; parent: NodeId; targets: { target: ShortcutTarget; name: string; icon: IconKey }[] } | { kind: 'createFolder'; parent: NodeId; name?: string } | { kind: 'rename'; id: NodeId; name: string } | { kind: 'delete'; ids: NodeId[]; permanent: boolean; now: number } | { kind: 'restore'; ids: NodeId[]; conflict: 'fail' | 'keepBoth' } | { kind: 'empty' } | { kind: 'move' | 'copy'; ids: NodeId[]; parent: NodeId }
 const siblings = (state: Snapshot, parent: NodeId, name: string, except?: NodeId) => Object.values(state.nodes).some(node => node.parentId === parent && node.id !== except && node.name.toLowerCase() === name.toLowerCase())
 export function freeName(state: Snapshot, parent: NodeId, name: string, extension = false) {
   if (!siblings(state, parent, name)) return name
@@ -19,6 +20,38 @@ function removeTree(state: Snapshot, id: NodeId) {
 }
 export function operate(source: Snapshot, operation: Operation): Result<{ snapshot: Snapshot; id?: NodeId }> {
   const state = structuredClone(source)
+  if (operation.kind === 'writeText') {
+    const node = state.nodes[operation.id]
+    if (!node || node.kind !== 'file' || node.payload.kind !== 'text' || inBin(state, node.id)) return failure('missing')
+    if (node.protected) return failure('protected')
+    node.payload.text = operation.text
+    node.bytes = new TextEncoder().encode(operation.text).length
+    node.modifiedAt = Date.now()
+  }
+  if (operation.kind === 'createText') {
+    const parent = state.nodes[operation.parent]
+    if (!parent || parent.kind !== 'folder' || inBin(state, parent.id)) return failure('missing')
+    const name = operation.name ?? freeName(state, parent.id, 'New Text Document.txt', true)
+    if (!validName(name)) return failure('invalidName')
+    if (siblings(state, parent.id, name)) return failure('duplicate')
+    const id = nodeId(crypto.randomUUID())
+    const text = operation.text ?? ''
+    state.nodes[id] = { id, parentId: parent.id, name, kind: 'file', bytes: new TextEncoder().encode(text).length, payload: { kind: 'text', text }, icon: 'textFile', createdAt: Date.now(), modifiedAt: Date.now(), protected: false, hidden: false }
+    return success({ snapshot: state, id })
+  }
+  if (operation.kind === 'shortcuts') {
+    const parent = state.nodes[operation.parent]
+    if (!parent || parent.kind !== 'folder' || inBin(state, parent.id)) return failure('missing')
+    let first: NodeId | undefined
+    for (const entry of operation.targets) {
+      if ((entry.target.kind === 'folder' || entry.target.kind === 'file') && (!state.nodes[entry.target.id] || inBin(state, entry.target.id))) return failure('missing')
+      const id = nodeId(crypto.randomUUID())
+      first ??= id
+      const name = freeName(state, parent.id, `${entry.name} - Shortcut.lnk`, true)
+      state.nodes[id] = { id, parentId: parent.id, name, kind: 'file', bytes: 0, payload: { kind: 'shortcut', target: entry.target }, icon: entry.icon, protected: false, hidden: false, createdAt: Date.now(), modifiedAt: Date.now() }
+    }
+    return success({ snapshot: state, id: first })
+  }
   if (operation.kind === 'createFolder') {
     const parent = state.nodes[operation.parent]
     if (!parent || parent.kind !== 'folder' || inBin(state, parent.id)) return failure('missing')
@@ -38,7 +71,7 @@ export function operate(source: Snapshot, operation: Operation): Result<{ snapsh
     for (const id of ids) {
       const node = state.nodes[id]
       if (!node || inBin(state, id)) return failure('missing')
-      if (node.protected) return failure('protected')
+      if (node.protected && operation.kind === 'move') return failure('protected')
       if (ancestors(state, parent.id).some(ancestor => ancestor.id === id)) return failure('cycle')
       const name = node.name.toLowerCase()
       if (names.has(name) || siblings(state, parent.id, node.name, operation.kind === 'move' ? id : undefined)) return failure('duplicate')
@@ -52,7 +85,7 @@ export function operate(source: Snapshot, operation: Operation): Result<{ snapsh
         const id = copies.get(node.id)
         const parentId = ids.includes(node.id) ? parent.id : node.parentId && copies.get(node.parentId)
         if (!id || !parentId) return failure('missing')
-        state.nodes[id] = { ...node, id, parentId, createdAt: Date.now() }
+        state.nodes[id] = { ...node, id, parentId, protected: false, createdAt: Date.now() }
       }
     }
   }

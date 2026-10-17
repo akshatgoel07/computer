@@ -15,6 +15,8 @@ const validDesktop = (value: unknown): value is DesktopPreferences => {
   return Object.values(value.cells).every(cell => cell && typeof cell === 'object' && 'x' in cell && typeof cell.x === 'number' && Number.isFinite(cell.x) && cell.x >= 0 && 'y' in cell && typeof cell.y === 'number' && Number.isFinite(cell.y) && cell.y >= 0)
 }
 type ShellStore = {
+  clipboard: { kind: 'cut' | 'copy'; ids: NodeId[] } | null
+  setClipboard: (clipboard: { kind: 'cut' | 'copy'; ids: NodeId[] } | null) => void
   dragIds: NodeId[]
   setDragIds: (ids: NodeId[]) => void
   desktop: DesktopPreferences
@@ -31,6 +33,7 @@ type ShellStore = {
 }
 
 export const useShellStore = create<ShellStore>((set) => ({
+  clipboard: null, setClipboard: clipboard => set({ clipboard }),
   dragIds: [], setDragIds: dragIds => set({ dragIds }),
   desktop: readPreference('computer.desktop.v1', initialDesktop, validDesktop),
   setDesktop: patch => set(state => { const desktop = { ...state.desktop, ...patch }; savePreference('computer.desktop.v1', desktop); return { desktop } }),
