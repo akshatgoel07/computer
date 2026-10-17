@@ -33,7 +33,7 @@ KB means 1,024 bytes. File sizes exclude disk allocation.
 | `public/cursors/arrow.cur` | [Source](https://raw.githubusercontent.com/marp/win10-to-win7-transformation-pack/master/Windhawk/ResourceRedirect/Windows/Cursors/aero_arrow.cur) | `aero_arrow.cur` | 13.62 |
 | `public/cursors/link.cur` | [Source](https://raw.githubusercontent.com/marp/win10-to-win7-transformation-pack/master/Windhawk/ResourceRedirect/Windows/Cursors/aero_link.cur) | `aero_link.cur` | 13.62 |
 | `public/cursors/busy.cur` | [Source](https://raw.githubusercontent.com/marp/win10-to-win7-transformation-pack/master/Windhawk/ResourceRedirect/Windows/Cursors/aero_busy.ani) | `aero_busy.ani` | 13.62 |
-| `public/images/boot/activity.webp` | [WebP limits](https://developers.google.com/speed/webp/faq?csw=1) | `activity.bmp` | Missing |
+| `public/images/boot/activity.webp` | [Source](https://raw.githubusercontent.com/powerCord1/windows-7-boot-html/main/activity.bmp) | `activity.bmp` | 73.93 |
 | `public/icons/roadrash.webp` | Not applicable | Not applicable | Excluded by the brief |
 
 ## Font files
@@ -59,13 +59,22 @@ The Start orb sheet measures 108 by 324 pixels.
 Each Start orb frame measures 108 by 108 pixels.
 The sheet contains three frames. The order is normal, hover, pressed.
 
-The brief specifies 105 boot frames of 200 by 200 pixels.
-One column needs a sheet of 200 by 21,000 pixels.
-WebP limits each dimension to 16,383 pixels.
-The `images.bootActivity` path cannot hold the required sheet in WebP format.
-A PNG path preserves the required layout. A WebP sheet needs multiple columns.
-I did not obtain the original `activity.bmp` file.
-`src/assets.ts` still specifies `/images/boot/activity.webp`.
+The source bitmap contains 105 frames of 200 by 200 pixels in one column.
+The [source repository](https://github.com/powerCord1/windows-7-boot-html/blob/main/README.md) identifies `bootres.dll` as the bitmap source.
+Frames 0, 50, and 104 match a [separate frame archive](https://github.com/peymanx/windows7_boot_animation_remake/tree/main/pieces) exactly.
+
+The boot sprite uses seven columns and 15 rows. It measures 1,400 by 3,000 pixels.
+Each frame measures 200 by 200 pixels. Frame indices start at zero.
+Frames progress across each row, then to the next row.
+Frame `i` has offsets `x = (i % 7) * 200` and `y = floor(i / 7) * 200`.
+
+Each frame retains the original black background. The conversion uses `cwebp -q 80`.
+All 105 frame positions match the source before compression.
+The source bitmap has this SHA256 value.
+
+```text
+7ac6141518bb34b6b27186569102c8d475eeb5cb75388f5256f458d82933d416
+```
 
 ## Cursor files
 
@@ -81,31 +90,29 @@ That frame retains its original sizes and hotspots.
 | Sounds | 141.81 | 700 |
 | Wallpaper | 40.13 | 300 |
 | Logon background | 25.05 | 200 |
-| Other images and icons | 20.06 | 400 |
+| Other images and icons | 93.99 | 400 |
 
 The `du -k -s` command reports disk allocation.
 
 ```text
 64	public/fonts
 172	public/sounds
-88	public/images
+164	public/images
 16	public/icons
 48	public/cursors
 ```
 
 ## Verification
 
-The path check found 25 of the 27 paths in `src/assets.ts`.
-The boot sheet is missing. The brief excludes Road Rash.
+The path check found 26 of the 27 paths in `src/assets.ts`.
+The brief excludes Road Rash.
 All 14 MP3 files pass `ffprobe` checks.
 All three fonts pass weight and character checks.
-All eight images pass decode and dimension checks.
+All nine images pass decode and dimension checks.
 All three cursors pass header, hotspot, and size checks.
 Each asset group meets its size limit.
 The command `corepack pnpm@11.5.0 build` passes.
 
 ## Missing files
 
-`public/images/boot/activity.webp` is missing because the required height exceeds the WebP limit.
-I did not obtain the original boot bitmap.
 `public/icons/roadrash.webp` is missing because the brief excludes this icon.
