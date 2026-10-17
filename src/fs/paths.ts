@@ -1,5 +1,5 @@
 import { desktopId, libraries, rootId, userId } from '@/fs/seed'
-import { nodeId, type FsNode, type Item, type Location, type NodeId, type Snapshot } from '@/fs/types'
+import { nodeId, type FsNode, type Item, type IconKey, type Location, type NodeId, type Snapshot } from '@/fs/types'
 export const sameLocation = (a: Location, b: Location) => JSON.stringify(a) === JSON.stringify(b)
 export const validName = (name: string) => name.length > 0 && name.length <= 255 && !/[<>:"/\\|?*\u0000-\u001f]/.test(name) && !/[ .]$/.test(name) && !/^(con|prn|aux|nul|com[1-9]|lpt[1-9])(?:\.|$)/i.test(name)
 export const natural = (a: string, b: string) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' })
@@ -38,12 +38,12 @@ export function itemsAt(state: Snapshot, location: Location, recent: NodeId[] = 
   else if (location.kind === 'library') nodes = [...children(state, nodeId(`akshat-${location.library}`)), ...children(state, nodeId(`public-${location.library}`))]
   else {
     if (location.name === 'libraries') return libraries.map(library => ({ id: `library-${library}`, name: library[0].toUpperCase() + library.slice(1), icon: `library${library[0].toUpperCase()}${library.slice(1)}` as 'libraryDocuments', location: { kind: 'library', library } }))
-    if (location.name === 'computer') return [{ id: 'c', name: 'Local Disk (C:)', icon: 'driveLocal', location: { kind: 'folder', id: rootId } }, { id: 'dvd', name: 'DVD RW Drive (D:)', icon: 'driveDvd' }]
+    if (location.name === 'computer') return [{ id: 'c', name: 'Local Disk (C:)', icon: 'driveLocal', node: state.nodes[rootId], location: { kind: 'folder', id: rootId } }, { id: 'dvd', name: 'DVD RW Drive (D:)', icon: 'driveDvd' }]
     if (location.name === 'desktop') nodes = children(state, desktopId)
     if (location.name === 'bin') nodes = Object.keys(state.bin).flatMap(id => state.nodes[nodeId(id)] ?? [])
     if (location.name === 'recent') nodes = recent.flatMap(id => state.nodes[id] && !inBin(state, id) ? [state.nodes[id]] : [])
   }
-  return nodes.map(node => ({ id: node.id, name: displayName(node), icon: node.icon, node, location: node.kind === 'folder' ? { kind: 'folder', id: node.id } : node.payload.kind === 'shortcut' ? node.payload.target : undefined }))
+  return nodes.map(node => ({ id: node.id, name: displayName(node), icon: node.icon, node, location: node.kind === 'folder' ? { kind: 'folder', id: node.id } : node.payload.kind === 'shortcut' && node.payload.target.kind !== 'file' ? node.payload.target : undefined }))
 }
 export function resolvePath(state: Snapshot, input: string): Location | null {
   const text = input.trim().replace(/\\+$/, '').toLowerCase()
@@ -56,3 +56,11 @@ export function resolvePath(state: Snapshot, input: string): Location | null {
   const node = Object.values(state.nodes).find(node => node.kind === 'folder' && !inBin(state, node.id) && pathFor(state, node.id).replace(/\\+$/, '').toLowerCase() === text)
   return node ? { kind: 'folder', id: node.id } : null
 }
+
+export const libraryIcons: Record<'documents' | 'music' | 'pictures' | 'videos', IconKey> = { documents: 'libraryDocuments', music: 'libraryMusic', pictures: 'libraryPictures', videos: 'libraryVideos' }
+export function locationIcon(state: Snapshot, location: Location): IconKey {
+  if (location.kind === 'library') return libraryIcons[location.library]
+  if (location.kind === 'folder') return state.nodes[location.id]?.icon ?? 'folder'
+  return { desktop: 'desktop', libraries: 'libraries', computer: 'computer', bin: Object.keys(state.bin).length ? 'recycleFull' as const : 'recycleEmpty' as const, recent: 'recentPlaces', homegroup: 'homegroup', network: 'network' }[location.name] as IconKey
+}
+export const viewOptions = [['Extra large icons', 'extraLarge'], ['Large icons', 'large'], ['Medium icons', 'medium'], ['Small icons', 'small'], ['List', 'list'], ['Details', 'details'], ['Tiles', 'tiles'], ['Content', 'content']] as const

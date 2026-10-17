@@ -1,5 +1,6 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { typeName } from '@/fs/paths'
+import { audioMetadata } from '@/fs/seed'
 import { nodeId, type Item } from '@/fs/types'
 import { type ExplorerSession, useExplorerStore } from '@/stores/explorerStore'
 import { requestDelete, showError } from '@/shell/DeleteDialog'
@@ -11,6 +12,7 @@ const date = (value?: number) => value ? new Date(value).toLocaleString('en-US',
 export const size = (bytes: number) => bytes > 0 ? `${Math.ceil(bytes / 1024)} KB` : ''
 export default function FileList({ windowId, session, items, renameId, finishRename, activate, onContext, emptyText }: { windowId: string; session: ExplorerSession; items: Item[]; renameId: string | null; finishRename: () => void; activate: (item: Item) => void; onContext: (event: React.MouseEvent, item?: Item) => void; emptyText: string }) {
   const files = useFilesStore()
+  const clipboard = useShellStore(state => state.clipboard)
   const list = useRef<HTMLDivElement>(null)
   const focusedId = useRef<string | null>(null)
   const gesture = useRef<{ x: number; y: number; initial: string[]; ctrl: boolean } | null>(null)
@@ -65,10 +67,10 @@ export default function FileList({ windowId, session, items, renameId, finishRen
     if (column === 'Date modified' || column === 'Date') return date(node.modifiedAt)
     if (column === 'Type' || column === 'Item type') return typeName(node)
     if (column === 'Size') return node.kind === 'file' ? size(node.bytes) : ''
-    if (column === 'Title') return node.kind === 'file' ? item.name : ''
+    if (node.kind === 'file' && node.payload.kind === 'audio') { const info = audioMetadata[node.payload.key]; if (column === 'Title') return info?.title ?? ''; if (column === 'Contributing artists') return info?.artist ?? ''; if (column === 'Album') return info?.album ?? '' }
     return ''
   }
-  return <div ref={list} className={`file-list view-${session.view}`} role="listbox" aria-label="Files" aria-multiselectable="true" data-focused={focused} tabIndex={0} onFocus={() => setFocused(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onDragOver={event => { if (useShellStore.getState().dragIds.length) event.preventDefault() }} onDrop={event => {
+  return <div ref={list} className={`file-list view-${session.view}`} data-app-focus role="listbox" aria-label="Files" aria-multiselectable="true" data-focused={focused} tabIndex={0} onFocus={() => setFocused(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onDragOver={event => { if (useShellStore.getState().dragIds.length) event.preventDefault() }} onDrop={event => {
     const ids = useShellStore.getState().dragIds
     if (!ids.length) return
     event.preventDefault()
@@ -88,7 +90,8 @@ export default function FileList({ windowId, session, items, renameId, finishRen
       event.preventDefault(); event.stopPropagation()
       const last = focusedId.current ?? session.selection.at(-1) ?? session.anchor
       const index = items.findIndex(item => item.id === last)
-      const count = session.view === 'large' ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / 116)) : session.view === 'tiles' ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / 256)) : 1
+      const cell = { extraLarge: 278, large: 116, medium: 78, small: 184, list: 184, details: 1, tiles: 256, content: 1 }[session.view]
+      const count = !['details', 'content', 'list'].includes(session.view) ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / cell)) : session.view === 'tiles' ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / 256)) : 1
       const delta = event.key === 'ArrowUp' ? -count : event.key === 'ArrowDown' ? count : event.key === 'ArrowLeft' ? -1 : 1
       const item = items[Math.max(0, Math.min(items.length - 1, index < 0 ? 0 : index + delta))]
       if (item) { focusedId.current = item.id; if (!event.ctrlKey) select(item, false, event.shiftKey); const element = event.currentTarget.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`); element?.focus({ preventScroll: true }); element?.scrollIntoView({ block: 'nearest' }) }
@@ -110,8 +113,8 @@ export default function FileList({ windowId, session, items, renameId, finishRen
     useShellStore.getState().setDragIds(ids)
     event.dataTransfer.setData('application/x-computer-nodes', JSON.stringify(ids))
     event.dataTransfer.effectAllowed = 'copyMove'
-  }} onDragEnd={() => useShellStore.getState().setDragIds([])} role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { focusedId.current = item.id; list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
-    <div className="file-name"><ItemImage item={item} large={session.view === 'large'} />{renameId === item.id ? <RenameInput item={item} finish={finishRename} /> : <span>{item.name}</span>}</div>{session.view === 'details' && columns.slice(1).map(([column]) => <span className="file-metadata" key={column}>{metadata(item, column)}</span>)}{session.view === 'tiles' && item.node && <span className="tile-metadata">{typeName(item.node)}{item.node.kind === 'file' && <><br />{size(item.node.bytes)}</>}</span>}
+  }} onDragEnd={() => useShellStore.getState().setDragIds([])} role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} data-cut={clipboard?.kind === 'cut' && clipboard.ids.includes(nodeId(item.id))} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { focusedId.current = item.id; list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
+    <div className="file-name"><ItemImage item={item} large={['extraLarge', 'large', 'medium', 'tiles', 'content'].includes(session.view)} />{renameId === item.id ? <RenameInput item={item} finish={finishRename} /> : <span>{item.name}</span>}</div>{session.view === 'details' && columns.slice(1).map(([column]) => <span className="file-metadata" key={column}>{metadata(item, column)}</span>)}{['tiles', 'content'].includes(session.view) && item.node && <span className="tile-metadata">{typeName(item.node)}{session.view === 'content' && <span className="content-date"> {date(item.node.modifiedAt)}</span>}{item.node.kind === 'file' && <><br />{size(item.node.bytes)}</>}</span>}
   </div>)}</div>}
   {!items.length && <div className={`empty-folder${session.query ? ' search-empty' : ''}`}>{emptyText}</div>}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}
   </div>

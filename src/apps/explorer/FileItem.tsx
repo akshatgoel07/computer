@@ -9,13 +9,14 @@ export function ItemImage({ item, large = false }: { item: Item; large?: boolean
   const [failed, setFailed] = useState(false)
   const node = item.node
   const source = large && node?.kind === 'file' && node.payload.kind === 'image' ? images[node.payload.key] : icons[item.icon]
-  return failed ? <span className={`icon-fallback ${node?.kind === 'file' ? 'file-fallback' : ''}`} aria-hidden="true" /> : <img src={source} alt="" draggable={false} onError={() => setFailed(true)} />
+  const image = failed ? <span className={`icon-fallback ${node?.kind === 'file' ? 'file-fallback' : ''}`} aria-hidden="true" /> : <img src={source} alt="" draggable={false} onError={() => setFailed(true)} />
+  return node?.kind === 'file' && node.payload.kind === 'shortcut' ? <span className="shortcut-icon">{image}<img className="shortcut-overlay" src={icons.shortcutOverlay} alt="" /></span> : image
 }
-export function RenameInput({ item, finish }: { item: Item; finish: () => void }) {
+export function RenameInput({ item, finish, multiline = false }: { item: Item; finish: () => void; multiline?: boolean }) {
   const node = item.node
   const [value, setValue] = useState(node ? displayName(node) : item.name)
   const [invalid, setInvalid] = useState(false)
-  const input = useRef<HTMLInputElement>(null)
+  const input = useRef<HTMLInputElement | HTMLTextAreaElement>(null)
   const done = useRef(false)
   useEffect(() => { input.current?.focus(); input.current?.select() }, [])
   const commit = () => {
@@ -26,7 +27,8 @@ export function RenameInput({ item, finish }: { item: Item; finish: () => void }
     else if (result.error === 'quota') { done.current = true; finish(); showError(result.error) }
     else { setInvalid(true); void play('ding'); input.current?.focus(); input.current?.select() }
   }
-  return <input className="rename-input" ref={input} aria-label="File name" aria-invalid={invalid} title={invalid ? 'Enter a valid name that differs from other items.' : undefined} value={value} onChange={event => { setValue(event.target.value); setInvalid(false) }} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onBlur={commit} onKeyDown={event => {
+  const Control = multiline ? 'textarea' : 'input'
+  return <Control className="rename-input" ref={(element: HTMLInputElement | HTMLTextAreaElement | null) => { input.current = element }} aria-label="File name" aria-invalid={invalid} title={invalid ? 'Enter a valid name that differs from other items.' : undefined} value={value} onChange={event => { setValue(event.target.value); setInvalid(false) }} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onBlur={commit} onKeyDown={event => {
     event.stopPropagation()
     if (event.key === 'Enter') { event.preventDefault(); commit() }
     if (event.key === 'Escape') { event.preventDefault(); done.current = true; finish() }

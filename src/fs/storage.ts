@@ -1,5 +1,5 @@
 import { icons, images, media } from '@/assets'
-import { seed, rootId } from '@/fs/seed'
+import { seed, rootId, applyAssetMetadata } from '@/fs/seed'
 import { nodeId, type Location, type Snapshot } from '@/fs/types'
 const key = 'computer.fs.v1'
 export const byteLimit = 2097152
@@ -32,8 +32,9 @@ export function parseSnapshot(value: unknown): Snapshot | null {
       if (!finite(node.bytes) || !object(payload)) return null
       if (payload.kind === 'text') { if (typeof payload.text !== 'string') return null }
       else if (payload.kind === 'image') { if (typeof payload.key !== 'string' || !(Object.hasOwn(images, payload.key))) return null }
+      else if (payload.kind === 'video' && payload.key === undefined) {}
       else if (payload.kind === 'audio' || payload.kind === 'video') { if (typeof payload.key !== 'string' || !(Object.hasOwn(media, payload.key))) return null }
-      else if (payload.kind === 'shortcut') { if (!location(payload.target) || (payload.target.kind === 'folder' && !nodes[payload.target.id])) return null }
+      else if (payload.kind === 'shortcut') { const target = payload.target; if (object(target) && target.kind === 'file') { if (typeof target.id !== 'string' || !object(nodes[target.id])) return null } else if (!location(target) || (target.kind === 'folder' && !nodes[target.id])) return null }
       else return null
     } else return null
     const seen = new Set<string>([id])
@@ -91,7 +92,7 @@ export function loadSnapshot(): Snapshot {
     raw = localStorage.getItem(key)
     if (raw === null) return seed()
     const value = parseSnapshot(JSON.parse(raw))
-    if (value && new TextEncoder().encode(raw).length <= byteLimit) return value
+    if (value && new TextEncoder().encode(raw).length <= byteLimit) return applyAssetMetadata(value)
   } catch { if (raw === null) writable = false }
   if (raw !== null) {
     try { localStorage.setItem(`computer.fs.recovery.${Date.now()}`, raw) }

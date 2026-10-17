@@ -1,0 +1,27 @@
+.photos-app { display: flex; flex-direction: column; height: 100%; background: #eef3fa; }
+.photo-menu { height: 28px; flex-shrink: 0; background: #f0f0f0; display: flex; align-items: center; gap: 4px; padding: 0 6px; }
+.win7 .photo-menu button { padding: 2px 8px; }
+.photo-stage { flex: 1; min-height: 0; overflow: auto; display: grid; place-items: center; background: #eef3fa; }
+.photo-bounds { position: relative; flex-shrink: 0; }
+.photo-bounds img { position: absolute; left: 50%; top: 50%; object-fit: contain; max-width: none; }
+.photo-controls { height: 52px; display: flex; flex-shrink: 0; align-items: center; justify-content: center; gap: 4px; border-top: 1px solid #c3d3e3; background: linear-gradient(#f6f9fc,#d9e5f3); }
+.win7 .photo-button { width: 28px; height: 28px; min-width: 28px; padding: 0; position: relative; border: 1px solid #9aaebf; border-radius: 4px; background: linear-gradient(#fff,#d6e6f5); }
+.win7 .photo-button:hover { background: linear-gradient(#fff,#a9d5f4); }
+.win7 .photo-button.photo-play { width: 44px; height: 44px; border-radius: 50%; background: linear-gradient(#fcffff,#8fc4ee); }
+.photo-control-gap { width: 8px; }
+.photo-controls input[type=range] { width: 100px; height: 20px; }
+.photo-glyph { position: absolute; width: 14px; height: 14px; left: 6px; top: 6px; }
+.photo-glyph.play,.photo-glyph.previous,.photo-glyph.next { width: 0; height: 0; border-top: 7px solid transparent; border-bottom: 7px solid transparent; border-left: 10px solid #265d88; }
+.photo-glyph.previous { border-left: 0; border-right: 10px solid #265d88; }
+.photo-play .photo-glyph { left: 17px; top: 14px; }
+.photo-glyph.pause { border-left: 4px solid #265d88; border-right: 4px solid #265d88; width: 12px; }
+.photo-glyph.fit { border: 2px solid #265d88; }
+.photo-glyph.zoom { width: 11px; height: 11px; border: 2px solid #265d88; border-radius: 50%; }
+.photo-glyph.zoom::after { content: ''; width: 7px; height: 2px; background: #265d88; position: absolute; left: 7px; top: 9px; transform: rotate(45deg); }
+.photo-glyph.rotate-left,.photo-glyph.rotate-right { border: 2px solid #265d88; border-top-color: transparent; border-radius: 50%; }
+.photo-glyph.rotate-left::before,.photo-glyph.rotate-right::before { content: ''; position: absolute; top: -4px; left: -4px; border-right: 5px solid #265d88; border-top: 4px solid transparent; border-bottom: 4px solid transparent; }
+.photo-glyph.rotate-right { transform: scaleX(-1); }
+.photo-glyph.delete { width: 10px; height: 12px; left: 8px; top: 9px; border: 2px solid #a73a33; border-top: 0; }
+.photo-glyph.delete::before { content: ''; position: absolute; height: 2px; width: 14px; left: -4px; top: -4px; background: #a73a33; }
+.photos-app { outline: none; }
+.photo-stage { place-items: safe center; }

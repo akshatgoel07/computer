@@ -5,7 +5,7 @@ import { readPreference, savePreference } from '@/fs/storage'
 import { type Location, type NodeId, type View } from '@/fs/types'
 import { useFilesStore } from '@/stores/filesStore'
 export type ExplorerSession = { location: Location; history: Location[]; historyIndex: number; selection: string[]; anchor: string | null; view: View; sort: { field: string; descending: boolean }; query: string }
-const validViews = (value: unknown): value is Record<string, View> => typeof value === 'object' && value !== null && Object.values(value).every(view => ['details', 'large', 'tiles'].includes(view))
+const validViews = (value: unknown): value is Record<string, View> => typeof value === 'object' && value !== null && Object.values(value).every(view => ['extraLarge', 'large', 'medium', 'small', 'list', 'details', 'tiles', 'content'].includes(view))
 const preferences = readPreference('computer.explorer.v1', {}, validViews)
 const defaultView = (location: Location): View => {
   if (location.kind === 'library') return ['pictures', 'videos'].includes(location.library) ? 'large' : 'details'

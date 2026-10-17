@@ -2,7 +2,7 @@ import { Suspense, useEffect, useRef, useState, type CSSProperties, type Pointer
 import { useExplorerStore } from '@/stores/explorerStore'
 import { useFilesStore } from '@/stores/filesStore'
 import { locationName } from '@/fs/paths'
-import { apps } from '@/lib/apps'
+import { apps, appSizes } from '@/lib/apps'
 import { resizeRect, visibleRect, workArea, type Rect, type ResizeEdge } from '@/lib/windowGeometry'
 import { useWindows, type WindowRecord } from '@/stores/windows'
 import { Spinner } from '@/boot/WelcomeScreen'
@@ -23,14 +23,15 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
   const title = location ? locationName(files, location) : record.title
   const app = apps[record.appId]
   const Content = app.component
-  const rect = record.mode === 'maximized' ? { x: 0, y: 0, ...viewport } : visibleRect(record.normalRect, viewport)
+  const minimum = { width: appSizes[record.appId]?.minWidth ?? 320, height: appSizes[record.appId]?.minHeight ?? 200 }
+  const rect = record.mode === 'maximized' ? { x: 0, y: 0, ...viewport } : visibleRect(record.normalRect, viewport, minimum)
   useEffect(() => {
     const resize = () => setViewport(workArea())
     window.addEventListener('resize', resize)
     return () => { window.removeEventListener('resize', resize); cancelAnimationFrame(raf.current) }
   }, [])
   useEffect(() => {
-    if (active && !record.minimized) frame.current?.focus({ preventScroll: true })
+    if (active && !record.minimized) (frame.current?.querySelector<HTMLElement>('[data-app-focus]') ?? frame.current)?.focus({ preventScroll: true })
   }, [active, record.minimized])
   const paint = () => {
     const node = frame.current
@@ -55,7 +56,7 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     if (!drag || event.pointerId !== drag.pointer) return
     const dx = event.clientX - drag.x
     const dy = event.clientY - drag.y
-    draft.current = drag.edge === 'move' ? visibleRect({ ...drag.rect, x: drag.rect.x + dx, y: drag.rect.y + dy }) : resizeRect(drag.rect, drag.edge, dx, dy)
+    draft.current = drag.edge === 'move' ? visibleRect({ ...drag.rect, x: drag.rect.x + dx, y: drag.rect.y + dy }) : resizeRect(drag.rect, drag.edge, dx, dy, minimum)
     cancelAnimationFrame(raf.current)
     raf.current = requestAnimationFrame(paint)
   }
@@ -75,7 +76,7 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     display: record.minimized ? 'none' : undefined,
   }
   return <section ref={frame} className={`window glass shell-window${explorer ? ' explorer-window' : ''}${active ? ' active' : ''}${record.mode === 'maximized' ? ' maximized' : ''}`}
-    style={style} role="dialog" aria-label={title} tabIndex={-1} data-peek={peek}
+    style={style} data-window-id={record.id} role="dialog" aria-label={title} tabIndex={-1} data-peek={peek}
     inert={record.minimized} onPointerDown={() => useWindows.getState().focus(record.id)}
     onPointerMove={update} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish}>
     <div className="title-bar" onPointerDown={event => begin(event, 'move')}
