@@ -9,7 +9,7 @@ import { useFilesStore } from '@/stores/filesStore'
 import { useExplorerStore } from '@/stores/explorerStore'
 type Request = { kind: 'delete'; ids: NodeId[]; permanent: boolean; empty: boolean } | { kind: 'error'; title: string; text: string; button?: 'Cancel'; icon?: IconKey } | { kind: 'restoreConflict'; ids: NodeId[] }
 export const useFileDialog = create<{ request: Request | null; show: (request: Request | null) => void }>(set => ({ request: null, show: request => set({ request }) }))
-const messages: Record<FsError, string> = { invalidName: 'The file name is not valid.', duplicate: 'A file or folder with this name already exists.', cycle: 'The destination is inside the source folder.', protected: 'You cannot change this system folder.', missing: 'This item no longer exists.', quota: 'Windows cannot save the file changes. Check the available browser storage.', restoreConflict: 'This location already contains a file with the same name.' }
+const messages: Record<FsError, string> = { invalidName: 'The file name is not valid.', duplicate: 'A file or folder with this name already exists.', cycle: 'The destination is inside the source folder.', protected: 'You cannot change this system folder.', missing: 'This item no longer exists.', quota: 'There is not enough space to save your changes.', restoreConflict: 'This location already contains a file with the same name.' }
 export function showError(error: FsError) {
   void play(error === 'quota' ? 'critical' : 'ding')
   useFileDialog.getState().show({ kind: 'error', title: 'Windows Explorer', text: messages[error] })
@@ -77,7 +77,7 @@ export default function DeleteDialog() {
     }
     setBusy(false)
   }
-  return <div className="file-modal-shade" onPointerDown={event => event.stopPropagation()}><div ref={panel} className="window glass active file-dialog" data-multiple={multiple} role="alertdialog" aria-modal="true" aria-label={title}>
+  return <div className="file-modal-shade" onPointerDown={event => event.stopPropagation()}><div ref={panel} className="window glass active file-dialog" data-multiple={multiple || request.kind !== 'delete'} role="alertdialog" aria-modal="true" aria-label={title}>
     <div className="title-bar"><div className="title-bar-text">{title}</div><div className="title-bar-controls"><button aria-label="Close" onClick={close} /></div></div>
     <div className="dialog-content"><img src={icons[request.kind === 'error' ? request.icon ?? 'error' : multiple ? 'recycleFull' : first?.icon ?? 'folder']} alt="" /><div><p>{question}</p>{first && !multiple && <div className="dialog-metadata"><strong>{first.name}</strong><br />{typeName(first)}{first.kind === 'file' && first.bytes > 0 ? `, ${Math.ceil(first.bytes / 1024)} KB` : ''}{first.modifiedAt > 0 && <><br />Date modified: {new Date(first.modifiedAt).toLocaleString('en-US')}</>}</div>}</div></div>
     <div className="dialog-footer">{request.kind === 'error' ? <button onClick={close}>{request.button ?? 'OK'}</button> : <><button onClick={confirm}>{request.kind === 'restoreConflict' ? 'Keep both files' : 'Yes'}</button><button onClick={close}>{request.kind === 'restoreConflict' ? 'Cancel' : 'No'}</button></>}</div>

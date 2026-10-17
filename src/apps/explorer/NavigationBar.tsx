@@ -1,7 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { icons, sprites } from '@/assets'
-import { ancestors, children, itemsAt, locationName, natural, pathFor, resolvePath, sameLocation } from '@/fs/paths'
-import { rootId } from '@/fs/seed'
+import { ancestors, children, itemsAt, locationIcon, locationName, natural, pathFor, resolvePath, sameLocation } from '@/fs/paths'
 import { type Location } from '@/fs/types'
 import { play } from '@/lib/sound'
 import { useExplorerStore, type ExplorerSession } from '@/stores/explorerStore'
@@ -72,7 +71,7 @@ export default function NavigationBar({ windowId, session }: { windowId: string;
       setMenu(null)
     }}>{index === session.historyIndex ? '✓ ' : ''}{locationName(files, location)}</button>)}</div>}</div>
     <div ref={address} className="address-field" onClick={event => { if (event.target === event.currentTarget) beginEdit() }}>
-      <img className="address-icon" src={icons[session.location.kind === 'folder' && session.location.id === rootId ? 'driveLocal' : 'folder']} alt="" />
+      <img className="address-icon" src={icons[locationIcon(files, session.location)]} alt="" />
       {edit ? <input ref={input} aria-label="Address" value={path} onChange={event => setPath(event.target.value)} onBlur={() => setEdit(false)} onKeyDown={event => { if (event.key === 'Enter') resolve(); if (event.key === 'Escape') setEdit(false) }} /> : <div className="breadcrumbs" onClick={event => { if (event.target === event.currentTarget) beginEdit() }}>{overflow > 0 && <div className="breadcrumb"><button className="shell-button breadcrumb-overflow" aria-label="Previous folders" aria-expanded={menu === 'overflow'} onClick={() => setMenu(menu === 'overflow' ? null : 'overflow')}>»</button>{menu === 'overflow' && <div className="explorer-popup breadcrumb-popup" role="menu">{segments.slice(0, overflow).map(location => <button className="shell-button" role="menuitem" key={JSON.stringify(location)} onClick={() => navigate(location)}>{locationName(files, location)}</button>)}</div>}</div>}{segments.slice(overflow).map((location, offset) => { const index = offset + overflow; return <div className="breadcrumb" key={JSON.stringify(location)}><button className="shell-button breadcrumb-label" onClick={() => navigate(location)}>{locationName(files, location)}</button><button className="shell-button breadcrumb-chevron" aria-label={`Folders in ${locationName(files, location)}`} aria-expanded={menu === index} onClick={() => setMenu(menu === index ? null : index)}><img src={icons.chevronRight} alt="" />›</button>{menu === index && <div className="explorer-popup breadcrumb-popup" role="menu">{menuItems.length ? menuItems.map(item => <button className="shell-button" role="menuitem" key={JSON.stringify(item.location)} style={{ fontWeight: segments[index + 1] && sameLocation(item.location, segments[index + 1]) ? 'bold' : undefined }} onClick={() => navigate(item.location)}>{item.label}</button>) : <button className="shell-button" disabled>(Empty)</button>}</div>}</div> })}</div>}
       <button className="shell-button refresh-button" aria-label="Refresh" onClick={() => useExplorerStore.getState().refresh(windowId)}><img src={icons.refresh} alt="" /></button>
     </div><div className="explorer-search"><input aria-label={`Search ${name}`} placeholder={`Search ${name}`} value={session.query} onChange={event => useExplorerStore.getState().patch(windowId, { query: event.target.value })} /><img src={icons.search} alt="" /></div>

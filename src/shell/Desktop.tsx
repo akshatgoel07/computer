@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { children, displayName, natural, writableParent } from '@/fs/paths'
+import { children, displayName, natural, typeName, writableParent } from '@/fs/paths'
 import { desktopId } from '@/fs/seed'
 import { nodeId, type Item } from '@/fs/types'
 import { ItemImage } from '@/apps/explorer/FileItem'
+import { blankMenu, itemMenu, sortMenu } from '@/shell/fileMenus'
+import { canPaste, openNode, paste, setClipboard } from '@/lib/fileActions'
 import { play } from '@/lib/sound'
 import { useExplorerStore } from '@/stores/explorerStore'
 import { useWindows } from '@/stores/windows'
@@ -20,12 +22,15 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
   const windows = useWindows(state => state.windows)
   const order = useWindows(state => state.order)
   const files = useFilesStore()
+  const clipboard = useShellStore(state => state.clipboard)
   const preferences = useShellStore(state => state.desktop)
-  const modal = useFileDialog(state => Boolean(state.request))
+  const localModal = useShellStore(state => state.modalCount > 0)
+  const globalModal = useFileDialog(state => Boolean(state.request))
+  const modal = globalModal || localModal
   const [peek, setPeek] = useState(false)
   const [selection, setSelection] = useState<string[]>([])
   const [renameId, setRenameId] = useState<string | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[]; width?: number } | null>(null)
   const [viewport, setViewport] = useState({ width: innerWidth, height: innerHeight - 40 })
   const [draft, setDraft] = useState<Record<string, { x: number; y: number }>>({})
   const [rectangle, setRectangle] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
@@ -49,7 +54,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
   const height = preferences.size === 'large' ? 136 : preferences.size === 'small' ? 76 : 100
   const rows = Math.max(1, Math.floor(viewport.height / height))
   const items: Item[] = [{ id: 'computer', name: 'Computer', icon: 'computer', location: { kind: 'shell', name: 'computer' } }, { id: 'recycle', name: 'Recycle Bin', icon: Object.keys(files.bin).length ? 'recycleFull' : 'recycleEmpty', location: { kind: 'shell', name: 'bin' } }, ...children(files, desktopId).map(node => ({ id: node.id, name: displayName(node), icon: node.icon, node, location: node.kind === 'folder' ? { kind: 'folder' as const, id: node.id } : undefined }))]
-  if (preferences.auto) items.sort((a, b) => natural(a.name, b.name))
+  if (preferences.auto) items.splice(2, items.length - 2, ...items.slice(2).sort((a, b) => preferences.sort === 'Size' ? (a.node?.kind === 'file' ? a.node.bytes : 0) - (b.node?.kind === 'file' ? b.node.bytes : 0) : preferences.sort === 'Date modified' ? (a.node?.modifiedAt ?? 0) - (b.node?.modifiedAt ?? 0) : preferences.sort === 'Item type' ? natural(a.node ? typeName(a.node) : '', b.node ? typeName(b.node) : '') : natural(a.name, b.name)))
   const positions: Record<string, { x: number; y: number }> = {}
   const occupied = new Set<string>()
   for (const [index, item] of items.entries()) {
@@ -61,9 +66,14 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     occupied.add(`${position.x},${position.y}`)
     positions[item.id] = position
   }
-  const activate = (item: Item) => { if (item.location) useWindows.getState().open('explorer', item.location) }
+  const activate = (item: Item) => { if (item.location) useWindows.getState().open('explorer', item.location); else if (item.node) openNode(item.node.id) }
   const createFolder = () => {
     const result = files.commit({ kind: 'createFolder', parent: desktopId })
+    if (!result.ok) { showError(result.error); return }
+    if (result.value) { setSelection([result.value]); anchor.current = result.value; setRenameId(result.value) }
+  }
+  const createText = () => {
+    const result = files.commit({ kind: 'createText', parent: desktopId })
     if (!result.ok) { showError(result.error); return }
     if (result.value) { setSelection([result.value]); anchor.current = result.value; setRenameId(result.value) }
   }
@@ -81,20 +91,24 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     const selected = item && !selection.includes(item.id) ? [item.id] : selection
     if (item) setSelection(selected)
     const change = useShellStore.getState().setDesktop
-    const entries: MenuEntry[] = item ? item.id === 'recycle' ? [{ label: 'Open', action: () => activate(item) }, { label: 'Empty Recycle Bin', action: Object.keys(files.bin).length ? () => requestDelete(Object.keys(files.bin).map(nodeId), true, true) : undefined }, { separator: true }, { label: 'Create shortcut' }, { label: 'Rename' }, { separator: true }, { label: 'Properties' }] : [{ label: 'Open', action: () => activate(item) }, { separator: true }, { label: 'Cut' }, { label: 'Copy' }, { label: 'Create shortcut' }, { label: 'Delete', action: item.node && !item.node.protected ? () => requestDelete(selected.map(nodeId)) : undefined }, { label: 'Rename', action: item.node && !item.node.protected && selected.length === 1 ? () => setRenameId(item.id) : undefined }, { separator: true }, { label: 'Properties' }] : [{ label: 'Large icons', action: () => change({ size: 'large' }), checked: preferences.size === 'large' }, { label: 'Medium icons', action: () => change({ size: 'medium' }), checked: preferences.size === 'medium' }, { label: 'Small icons', action: () => change({ size: 'small' }), checked: preferences.size === 'small' }, { separator: true }, { label: 'Auto arrange icons', action: () => change({ auto: !preferences.auto }), checked: preferences.auto }, { label: 'Align icons to grid', action: () => change({ align: !preferences.align }), checked: preferences.align }, { label: 'Show desktop icons', action: () => change({ show: !preferences.show }), checked: preferences.show }, { separator: true }, { label: 'Refresh', action: () => setDraft({}) }, { label: 'Paste' }, { label: 'Paste shortcut' }, { separator: true }, { label: 'New folder', action: createFolder }, { separator: true }, { label: 'Screen resolution' }, { label: 'Gadgets' }, { label: 'Personalize' }]
-    setMenu({ x: event.clientX, y: event.clientY, entries })
+    const selectedItems = items.filter(item => selected.includes(item.id))
+    const view: MenuEntry[] = ([['Large icons', 'large'], ['Medium icons', 'medium'], ['Small icons', 'small']] as const).map(([label, size]) => ({ label, checked: preferences.size === size, action: () => change({ size }) }))
+    view.push({ separator: true }, { label: 'Auto arrange icons', checked: preferences.auto, action: () => change({ auto: !preferences.auto }) }, { label: 'Align icons to grid', checked: preferences.align, action: () => change({ align: !preferences.align }) }, { separator: true }, { label: 'Show desktop icons', checked: preferences.show, action: () => change({ show: !preferences.show }) }, { label: 'Show desktop gadgets', checked: preferences.gadgets ?? true, action: () => change({ gadgets: !(preferences.gadgets ?? true) }) })
+    const entries = item ? itemMenu({ item, selected: selectedItems, parent: desktopId, bin: false, open: () => activate(item), openWindow: () => { const payload = item.node?.kind === 'file' ? item.node.payload : null; const target = payload?.kind === 'shortcut' && (payload.target.kind === 'file' || payload.target.kind === 'folder') ? files.nodes[payload.target.id]?.parentId : null; if (target) useWindows.getState().open('explorer', { kind: 'folder', id: target }); else if (item.location) useWindows.getState().open('explorer', item.location) }, rename: () => setRenameId(item.id), remove: () => requestDelete(selected.map(nodeId)) }) : blankMenu({ desktop: true, view, sort: sortMenu(preferences.sort, sort => { const sorted = [...items.slice(0, 2), ...items.slice(2).sort((a, b) => sort === 'Size' ? (a.node?.kind === 'file' ? a.node.bytes : 0) - (b.node?.kind === 'file' ? b.node.bytes : 0) : sort === 'Date modified' ? (a.node?.modifiedAt ?? 0) - (b.node?.modifiedAt ?? 0) : sort === 'Item type' ? natural(a.node ? typeName(a.node) : '', b.node ? typeName(b.node) : '') : natural(a.name, b.name))]; change({ sort, cells: Object.fromEntries(sorted.map((item, index) => [item.id, { x: Math.floor(index / rows) * width, y: index % rows * height }])) }) }), refresh: () => setDraft({}), parent: desktopId, folder: createFolder, text: createText })
+    setMenu({ x: event.clientX, y: event.clientY, entries, width: item ? 256 : 208 })
   }
   return <main className="win7 desktop" inert={!enabled} aria-label="Desktop"><div inert={modal}>
     <div className="wallpaper" />
     <div ref={grid} className="desktop-grid" tabIndex={0} aria-label="Desktop files" onContextMenu={event => context(event)} onKeyDown={event => {
-      if (event.target instanceof HTMLInputElement) return
+      if (event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+      if (event.ctrlKey && ['c', 'x', 'v'].includes(event.key.toLowerCase())) { event.preventDefault(); const key = event.key.toLowerCase(); if (key === 'v') { if (canPaste()) paste(desktopId) } else setClipboard(key === 'x' ? 'cut' : 'copy', selection.filter(id => Boolean(files.nodes[nodeId(id)])).map(nodeId)); return }
       if (event.key === 'Enter') { event.preventDefault(); for (const item of items.filter(item => selection.includes(item.id))) activate(item) }
       else if (event.key === 'F2') { event.preventDefault(); rename() }
       else if (event.key === 'Delete') { event.preventDefault(); remove(event.shiftKey) }
       else if (event.key === 'F5') { event.preventDefault(); setDraft({}) }
       else if (event.ctrlKey && event.key.toLowerCase() === 'a') { event.preventDefault(); setSelection(items.map(item => item.id)) }
       else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { event.preventDefault(); createFolder() }
-      else if (event.key === 'Escape') { setMenu(null); drag.current = null; rubber.current = null; setDraft({}); setRectangle(null) }
+      else if (event.key === 'Escape') { if (clipboard?.kind === 'cut') useShellStore.getState().setClipboard(null); setMenu(null); drag.current = null; rubber.current = null; setDraft({}); setRectangle(null) }
       else if (event.key === 'ContextMenu' || event.shiftKey && event.key === 'F10') { event.preventDefault(); const item = items.find(item => item.id === selection[0]); const point = item ? positions[item.id] : { x: 0, y: 0 }; context({ preventDefault() {}, stopPropagation() {}, clientX: point.x + 20, clientY: point.y + 30 } as React.MouseEvent, item) }
       else if (event.key.startsWith('Arrow')) { event.preventDefault(); const focused = document.activeElement instanceof HTMLElement ? document.activeElement.closest('[data-item-id]')?.getAttribute('data-item-id') : null; const index = Math.max(0, items.findIndex(item => item.id === (focused ?? selection.at(-1)))); const delta = event.key === 'ArrowDown' ? 1 : event.key === 'ArrowUp' ? -1 : event.key === 'ArrowRight' ? rows : -rows; const item = items[Math.max(0, Math.min(items.length - 1, index + delta))]; if (item) { grid.current?.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`)?.focus(); if (!event.ctrlKey) { const a = Math.max(0, items.findIndex(value => value.id === anchor.current)); const b = items.findIndex(value => value.id === item.id); setSelection(event.shiftKey ? items.slice(Math.min(a, b), Math.max(a, b) + 1).map(value => value.id) : [item.id]); if (!event.shiftKey) anchor.current = item.id } } }
     }} onPointerDown={event => {
@@ -171,7 +185,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
       drag.current = null; rubber.current = null; setRectangle(null); setDraft({})
       if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
     }} onPointerCancel={() => { drag.current = null; rubber.current = null; setRectangle(null); setDraft({}) }}>
-      {preferences.show && items.map(item => <DesktopIcon key={item.id} item={item} selected={selection.includes(item.id)} position={positions[item.id]} size={preferences.size} rename={renameId === item.id} finishRename={() => { setRenameId(null); grid.current?.focus() }} dragging={false} onClick={event => {
+      {preferences.show && items.map(item => <DesktopIcon key={item.id} item={item} selected={selection.includes(item.id)} position={positions[item.id]} size={preferences.size} rename={renameId === item.id} finishRename={() => { setRenameId(null); grid.current?.focus() }} dragging={false} cut={clipboard?.kind === 'cut' && clipboard.ids.includes(nodeId(item.id))} onClick={event => {
         if (suppressClick.current) { suppressClick.current = false; return }
         const a = Math.max(0, items.findIndex(value => value.id === anchor.current)); const b = items.findIndex(value => value.id === item.id)
         setSelection(event.shiftKey ? [...new Set([...(event.ctrlKey ? selection : []), ...items.slice(Math.min(a, b), Math.max(a, b) + 1).map(value => value.id)])] : event.ctrlKey || event.metaKey ? selection.includes(item.id) ? selection.filter(id => id !== item.id) : [...selection, item.id] : [item.id])

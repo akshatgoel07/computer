@@ -1,12 +1,16 @@
 import { useEffect, useRef, useState } from 'react'
 import { ancestors, inBin, itemsAt, natural, typeName, writableParent } from '@/fs/paths'
 import { type Item } from '@/fs/types'
+import { images } from '@/assets'
+import { blankMenu, itemMenu, sortMenu, viewsMenu } from '@/shell/fileMenus'
+import { canPaste, openNode, paste, setClipboard } from '@/lib/fileActions'
+import { useShellStore } from '@/stores/shellStore'
 import { play } from '@/lib/sound'
 import { useExplorerStore } from '@/stores/explorerStore'
 import { useFilesStore } from '@/stores/filesStore'
 import { useWindows } from '@/stores/windows'
 import ContextMenu, { type MenuEntry } from '@/shell/ContextMenu'
-import { requestDelete, restoreItems, showError, useFileDialog } from '@/shell/DeleteDialog'
+import { requestDelete, showError, useFileDialog } from '@/shell/DeleteDialog'
 import NavigationBar from './NavigationBar'
 import NavigationPane from './NavigationPane'
 import CommandBar from './CommandBar'
@@ -18,16 +22,18 @@ export default function Explorer({ windowId }: { windowId: string }) {
   const session = useExplorerStore(state => state.sessions[windowId])
   const recent = useExplorerStore(state => state.recent)
   const files = useFilesStore()
+  useShellStore(state => state.clipboard)
   const panel = useRef<HTMLDivElement>(null)
   const [renameId, setRenameId] = useState<string | null>(null)
   const [details, setDetails] = useState(true)
+  const [preview, setPreview] = useState(false)
   const [navigation, setNavigation] = useState(true)
   const [paneWidth, setPaneWidth] = useState(182)
   const [menuBar, setMenuBar] = useState(false)
   const [query, setQuery] = useState('')
   const priorQuery = useRef('')
   const priorSelection = useRef<string[]>([])
-  const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null)
+  const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[]; width?: number } | null>(null)
   useEffect(() => { const timer = setTimeout(() => setQuery(session?.query ?? ''), 200); return () => clearTimeout(timer) }, [session?.query])
   useEffect(() => {
     if (!session || session.location.kind !== 'folder') return
@@ -70,6 +76,13 @@ export default function Explorer({ windowId }: { windowId: string }) {
     if (!result.ok) { showError(result.error); return }
     if (result.value) { useExplorerStore.getState().patch(windowId, { selection: [result.value], anchor: result.value }); setRenameId(result.value); setTimeout(() => panel.current?.querySelector('.rename-input')?.scrollIntoView({ block: 'nearest' }), 0) }
   }
+  const createText = () => {
+    const parent = writableParent(session.location)
+    if (!parent) return
+    const result = files.commit({ kind: 'createText', parent })
+    if (!result.ok) { showError(result.error); return }
+    if (result.value) { useExplorerStore.getState().patch(windowId, { selection: [result.value], anchor: result.value }); setRenameId(result.value) }
+  }
   const rename = () => { if (selected.length === 1 && selected[0].node && !selected[0].node.protected && !bin) setRenameId(selected[0].id); else void play('ding') }
   const remove = (permanent = false) => {
     if (selected.some(item => !item.node || item.node.protected)) { void play('ding'); return }
@@ -78,20 +91,34 @@ export default function Explorer({ windowId }: { windowId: string }) {
   const activate = (item: Item) => {
     if (bin && item.node) { useFileDialog.getState().show({ kind: 'error', title: `${item.node.name} Properties`, text: `${item.node.name}\n${typeName(item.node)}`, icon: item.node.icon }); return }
     if (item.location) useExplorerStore.getState().navigate(windowId, item.location)
+    else if (item.node?.kind === 'file') openNode(item.node.id, items.flatMap(item => item.node ? [item.node.id] : []))
     else if (item.id === 'dvd') useFileDialog.getState().show({ kind: 'error', title: 'DVD RW Drive (D:)', text: 'Please insert a disc into drive D:.', button: 'Cancel', icon: 'driveDvd' })
   }
   const context = (event: React.MouseEvent, item?: Item) => {
     event.preventDefault()
     const selection = item && !session.selection.includes(item.id) ? [item] : selected
-    const protectedItem = selection.some(entry => !entry.node || entry.node.protected)
-    const entries: MenuEntry[] = item ? bin ? [{ label: 'Restore', action: () => restoreItems(selection.flatMap(entry => entry.node ? [entry.node.id] : [])) }, { separator: true }, { label: 'Cut' }, { label: 'Delete', action: () => requestDelete(selection.flatMap(entry => entry.node ? [entry.node.id] : []), true) }, { separator: true }, { label: 'Properties' }] : [{ label: 'Open', action: item.location ? () => activate(item) : undefined }, { label: 'Open in new window', action: item.location ? () => useWindows.getState().open('explorer', item.location) : undefined }, { separator: true }, { label: 'Cut' }, { label: 'Copy' }, { separator: true }, { label: 'Create shortcut' }, { label: 'Delete', action: protectedItem ? undefined : () => requestDelete(selection.flatMap(entry => entry.node ? [entry.node.id] : [])) }, { label: 'Rename', action: !protectedItem && selection.length === 1 ? () => setRenameId(item.id) : undefined }, { separator: true }, { label: 'Properties' }] : [{ label: 'Details', action: () => useExplorerStore.getState().patch(windowId, { view: 'details' }), checked: session.view === 'details' }, { label: 'Large icons', action: () => useExplorerStore.getState().patch(windowId, { view: 'large' }), checked: session.view === 'large' }, { separator: true }, { label: 'Refresh', action: () => useExplorerStore.getState().refresh(windowId) }, { separator: true }, { label: 'New folder', action: writableParent(session.location) ? createFolder : undefined }, { label: 'Properties' }]
-    setMenu({ x: event.clientX, y: event.clientY, entries })
+    const parent = writableParent(session.location)
+    const entries = item ? itemMenu({ item, selected: selection, parent, bin, open: () => activate(item), openWindow: () => {
+      const payload = item.node?.kind === 'file' ? item.node.payload : null
+      const target = payload?.kind === 'shortcut' && (payload.target.kind === 'file' || payload.target.kind === 'folder') ? files.nodes[payload.target.id]?.parentId : null
+      if (target) useWindows.getState().open('explorer', { kind: 'folder', id: target })
+      else if (item.location) useWindows.getState().open('explorer', item.location)
+    }, rename: () => setRenameId(item.id), remove: () => requestDelete(selection.flatMap(entry => entry.node ? [entry.node.id] : [])) }) : blankMenu({ desktop: false, view: viewsMenu(session.view, view => useExplorerStore.getState().patch(windowId, { view })), sort: sortMenu(session.sort.field, field => useExplorerStore.getState().patch(windowId, { sort: { field, descending: session.sort.field === field && !session.sort.descending } })), refresh: () => useExplorerStore.getState().refresh(windowId), parent, folder: createFolder, text: createText })
+    setMenu({ x: event.clientX, y: event.clientY, entries, width: item ? 256 : 208 })
   }
   let emptyText = query ? 'No items match your search.' : 'This folder is empty.'
   if (session.location.kind === 'shell' && session.location.name === 'homegroup') emptyText = 'No other homegroup computers are currently available.'
   if (session.location.kind === 'shell' && session.location.name === 'network') emptyText = 'No computers found.'
   return <div ref={panel} className="explorer-app" data-window-id={windowId} onKeyDown={event => {
     if (useFileDialog.getState().request || event.target instanceof HTMLInputElement || event.target instanceof HTMLTextAreaElement) return
+    if (event.key === 'Escape') { if (useShellStore.getState().clipboard?.kind === 'cut') useShellStore.getState().setClipboard(null); return }
+    if (event.ctrlKey && ['c', 'x', 'v'].includes(event.key.toLowerCase())) {
+      event.preventDefault()
+      const key = event.key.toLowerCase()
+      if (key === 'v') { const parent = writableParent(session.location); if (parent && canPaste()) paste(parent) }
+      else if (!bin) setClipboard(key === 'x' ? 'cut' : 'copy', selected.flatMap(item => item.node ? [item.node.id] : []))
+      return
+    }
     if (event.key === 'Alt') { event.preventDefault(); setMenuBar(!menuBar); return }
     if (event.altKey && event.key === 'ArrowLeft') { event.preventDefault(); useExplorerStore.getState().back(windowId) }
     else if (event.altKey && event.key === 'ArrowRight') { event.preventDefault(); useExplorerStore.getState().forward(windowId) }
@@ -104,14 +131,14 @@ export default function Explorer({ windowId }: { windowId: string }) {
     else if (event.key === 'F10' && event.shiftKey || event.key === 'ContextMenu') { event.preventDefault(); const rect = panel.current?.querySelector('.file-item[aria-selected=true]')?.getBoundingClientRect() ?? panel.current!.getBoundingClientRect(); context({ preventDefault() {}, clientX: rect.left + 20, clientY: rect.top + 20 } as React.MouseEvent, selected[0]) }
   }}>
     {menuBar && <div className="explorer-menubar">{['File', 'Edit', 'View', 'Tools', 'Help'].map(label => <button className="shell-button" key={label} disabled>{label}</button>)}</div>}
-    <NavigationBar windowId={windowId} session={session} /><CommandBar windowId={windowId} session={session} createFolder={createFolder} rename={rename} remove={() => remove()} details={details} setDetails={setDetails} navigation={navigation} setNavigation={setNavigation} />
+    <NavigationBar windowId={windowId} session={session} /><CommandBar windowId={windowId} session={session} createFolder={createFolder} preview={preview} setPreview={setPreview} menuBar={menuBar} setMenuBar={setMenuBar} rename={rename} remove={() => remove()} details={details} setDetails={setDetails} navigation={navigation} setNavigation={setNavigation} />
     <div className="explorer-middle">{navigation && <div className="navigation-container" style={{ width: paneWidth }}><NavigationPane windowId={windowId} location={session.location} /><div className="pane-divider" onPointerDown={event => {
       event.currentTarget.setPointerCapture(event.pointerId)
       const start = event.clientX; const initial = paneWidth; const element = event.currentTarget
       const move = (pointer: PointerEvent) => setPaneWidth(Math.max(120, Math.min(320, initial + pointer.clientX - start)))
       const stop = () => { element.removeEventListener('pointermove', move); element.removeEventListener('pointerup', stop) }
       element.addEventListener('pointermove', move); element.addEventListener('pointerup', stop, { once: true })
-    }} /></div>}<FileList windowId={windowId} session={session} items={items} renameId={renameId} finishRename={() => { setRenameId(null); focusList() }} activate={activate} onContext={context} emptyText={emptyText} /></div>
-    {details && <DetailsPane items={items} selected={selected} />}{menu && <ContextMenu {...menu} close={() => { setMenu(null); focusList() }} />}
+    }} /></div>}<FileList windowId={windowId} session={session} items={items} renameId={renameId} finishRename={() => { setRenameId(null); focusList() }} activate={activate} onContext={context} emptyText={emptyText} />{preview && <aside className="preview-pane" aria-label="Preview pane">{selected.length === 1 && selected[0].node?.kind === 'file' && selected[0].node.payload.kind === 'image' ? <img src={images[selected[0].node.payload.key]} alt={selected[0].name} /> : selected.length === 1 && selected[0].node?.kind === 'file' && selected[0].node.payload.kind === 'text' ? <pre>{selected[0].node.payload.text.slice(0, 4096)}</pre> : <span>No preview available.</span>}</aside>}</div>
+    {details && <DetailsPane items={items} selected={selected} location={session.location} />}{menu && <ContextMenu {...menu} close={() => { setMenu(null); focusList() }} />}
   </div>
 }
