@@ -46,15 +46,16 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     if (animation.current?.playState === 'running') {
       const computed = getComputedStyle(element)
       const matrix = new DOMMatrix(computed.transform)
-      source = { x: base.current.x + matrix.e, y: base.current.y + matrix.f, width: base.current.width * matrix.a, height: base.current.height * matrix.d }
+      const origin = computed.transformOrigin.split(' ').map(Number.parseFloat)
+      source = { x: base.current.x + matrix.e + origin[0] * (1 - matrix.a), y: base.current.y + matrix.f + origin[1] * (1 - matrix.d), width: base.current.width * matrix.a, height: base.current.height * matrix.d }
       opacity = Number(computed.opacity)
     }
     animation.current?.cancel()
     lastToken.current = record.transition.token
     previous.current = rect
     base.current = rect
-    setHidden(false)
     const kind = record.transition.kind
+    if (kind !== 'close' || !record.minimized) setHidden(false)
     const center = kind === 'open' || kind === 'close'
     element.style.transformOrigin = center ? 'center center' : '0px 0px'
     const frames: Keyframe[] = kind === 'open' ? [{ opacity: 0, transform: 'scale(.95)' }, { opacity: 1, transform: 'scale(1)' }]
@@ -134,7 +135,12 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     paint()
     const snap = useAero.getState().snap
     if (draft.current) {
-      if (snap && drag.edge === 'move' && event.type !== 'pointercancel') useWindows.getState().geometry(record.id, snap, draft.current)
+      if (snap && drag.edge === 'move' && event.type !== 'pointercancel') {
+        const source = draft.current
+        useWindows.getState().geometry(record.id, snap, source)
+        draft.current = modeRect(snap, record.normalRect, viewport)
+        paint()
+      }
       else useWindows.getState().move(record.id, draft.current)
     }
     useAero.setState({ snap: null })

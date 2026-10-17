@@ -5,7 +5,6 @@ import BootSequence from '@/boot/BootSequence'
 import WelcomeScreen from '@/boot/WelcomeScreen'
 const Desktop = lazy(() => import('@/shell/Desktop'))
 import { useShellStore } from '@/stores/shellStore'
-import { useWindows } from '@/stores/windows'
 
 export default function App() {
   const session = useShellStore(state => state.session)
@@ -21,7 +20,7 @@ export default function App() {
   }, [])
   useEffect(() => {
     if (session !== 'shutdown' && session !== 'restart' && session !== 'logoff') return
-    useWindows.getState().reset()
+    void import('@/stores/windows').then(({ useWindows }) => useWindows.getState().reset())
     const timer = setTimeout(() => setSession(session === 'restart' ? 'boot' : session === 'logoff' ? 'welcome' : 'idle'), 1500)
     return () => clearTimeout(timer)
   }, [session, setSession])
