@@ -54,7 +54,7 @@ export default function Photos({ windowId }: { windowId: string }) {
   const bounds = swapped ? { width: natural.height, height: natural.width } : natural
   const scale = zoom === null ? Math.min(space.width / bounds.width, space.height / bounds.height) : zoom / 100
   const rotate = (delta: number) => { if (current) setRotation(values => ({ ...values, [current]: (values[current] ?? 0) + delta })) }
-  const button = (label: string, glyph: string, action: () => void, large = false) => <button key={label} className={`photo-button ${large ? 'photo-play' : ''}`} aria-label={label} title={label} disabled={!live} onClick={action}><span className={`photo-glyph ${glyph}`} /></button>
+  const button = (label: string, glyph: string, action: () => void, large = false) => <button key={label} className={`photo-button ${large ? 'photo-play' : ''}`} aria-label={label} data-tooltip={label} disabled={!live} onClick={action}><span className={`photo-glyph ${glyph}`} /></button>
   return <div className="photos-app" tabIndex={0} data-app-focus onKeyDown={event => {
     if (event.target instanceof HTMLInputElement) return
     if (event.key === 'ArrowRight') { event.preventDefault(); next(1) }

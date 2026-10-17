@@ -27,14 +27,13 @@ export default function Tooltip() {
       close = setTimeout(() => setTip(null), duration(100))
     }
     const over = (event: PointerEvent) => {
-      const next = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-tooltip],[title]') : null
+      const next = event.target instanceof Element ? event.target.closest<HTMLElement>('[data-tooltip],button[aria-label]') : null
       if (next === target) return
       hide()
       target = next
       if (!next) return
-      const text = next.getAttribute('title') ?? next.dataset.tooltip
+      const text = next.dataset.tooltip ?? next.getAttribute('aria-label')
       if (!text) return
-      if (next.hasAttribute('title')) { next.dataset.tooltip = text; next.removeAttribute('title') }
       x = event.clientX; y = event.clientY
       open = setTimeout(() => {
         if (!next.isConnected || next.closest('[inert]')) return
