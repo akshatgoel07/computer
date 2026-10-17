@@ -96,3 +96,27 @@
 .edge-ne, .edge-sw { cursor: nesw-resize; }
 @keyframes start-open { from { opacity: 0; } to { opacity: 1; } }
 @media (max-width: 410px) { .start-menu { transform: scale(calc(100vw / 410px)); transform-origin: bottom left; } }
+.file-modal-shade { position: fixed; inset: 0; z-index: 1500; display: grid; place-items: center; }
+.win7 .file-dialog.window { width: 458px; max-width: calc(100vw - 16px); padding: 29px 7px 7px; position: relative; }
+.win7 .file-dialog > .title-bar { position: absolute; left: -1px; right: -1px; top: -1px; height: 30px; margin: 0; }
+.file-dialog .dialog-content { display: flex; gap: 12px; min-height: 116px; background: white; padding: 16px; }
+.file-dialog .dialog-content > img { width: 48px; height: 48px; object-fit: contain; flex-shrink: 0; }
+.file-dialog .dialog-content p { margin: 0 0 10px; }
+.dialog-metadata { font-size: 12px; line-height: 16px; }
+.dialog-metadata strong { font-weight: 400; }
+.dialog-footer { display: flex; justify-content: flex-end; align-items: center; gap: 7px; height: 42px; background: #f0f0f0; border-top: 1px solid #dfdfdf; padding-right: 11px; }
+.win7 .dialog-footer button { min-width: 75px; height: 23px; }
+.win7 .desktop-grid { position: absolute; inset: 0 0 40px; z-index: 10; outline: none; }
+.win7 .desktop-grid .desktop-icon.shell-button { position: absolute; margin: 0; }
+.win7 .desktop-grid .desktop-icon input { position: absolute; top: var(--label-top,59px); left: 0; width: 74px; height: 32px; z-index: 2; }
+.win7 .desktop-grid .desktop-icon .icon-fallback { position: absolute; left: 14px; top: 8px; width: 48px; height: 48px; text-shadow: none; }
+.win7 .desktop-icon[data-drag=true] { opacity: .5; }
+.win7 .desktop-grid .desktop-image { max-height: none; overflow: visible; }
+.win7 .desktop-grid .desktop-image img,.win7 .desktop-grid .desktop-image .icon-fallback { position: static; display: block; width: 100%; height: 100%; }
+.file-dialog .dialog-content { min-height: 126px; }
+.file-dialog[data-multiple=true] .dialog-content { min-height: 74px; }
+.file-dialog[data-multiple=true] .dialog-content > img { width: 32px; height: 32px; }
+.desktop-drag-image { position: absolute; opacity: .5; pointer-events: none; color: white; text-align: center; z-index: 2; }
+.desktop-drag-image img,.desktop-drag-image .icon-fallback { display: block; width: 48px; height: 48px; margin: 8px auto 3px; object-fit: contain; }
+.desktop-drag-image > span { text-shadow: 1px 1px 2px black; }
+.desktop-drag-image > div > img,.desktop-drag-image > div > .icon-fallback { width: 100%; height: 100%; margin: 0; }

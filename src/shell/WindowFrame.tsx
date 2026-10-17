@@ -1,4 +1,7 @@
 import { Suspense, useEffect, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { useExplorerStore } from '@/stores/explorerStore'
+import { useFilesStore } from '@/stores/filesStore'
+import { locationName } from '@/fs/paths'
 import { apps } from '@/lib/apps'
 import { resizeRect, visibleRect, workArea, type Rect, type ResizeEdge } from '@/lib/windowGeometry'
 import { useWindows, type WindowRecord } from '@/stores/windows'
@@ -14,6 +17,10 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
   const raf = useRef(0)
   const draft = useRef<Rect | null>(null)
   const [viewport, setViewport] = useState(workArea)
+  const location = useExplorerStore(state => state.sessions[record.id]?.location)
+  const files = useFilesStore()
+  const explorer = record.launchContext.kind === 'explorer'
+  const title = location ? locationName(files, location) : record.title
   const app = apps[record.appId]
   const Content = app.component
   const rect = record.mode === 'maximized' ? { x: 0, y: 0, ...viewport } : visibleRect(record.normalRect, viewport)
@@ -67,23 +74,23 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     left: rect.x, top: rect.y, width: rect.width, height: rect.height, zIndex,
     display: record.minimized ? 'none' : undefined,
   }
-  return <section ref={frame} className={`window glass shell-window${active ? ' active' : ''}${record.mode === 'maximized' ? ' maximized' : ''}`}
-    style={style} role="dialog" aria-label={record.title} tabIndex={-1} data-peek={peek}
+  return <section ref={frame} className={`window glass shell-window${explorer ? ' explorer-window' : ''}${active ? ' active' : ''}${record.mode === 'maximized' ? ' maximized' : ''}`}
+    style={style} role="dialog" aria-label={title} tabIndex={-1} data-peek={peek}
     inert={record.minimized} onPointerDown={() => useWindows.getState().focus(record.id)}
     onPointerMove={update} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish}>
     <div className="title-bar" onPointerDown={event => begin(event, 'move')}
       onDoubleClick={event => {
         if (!(event.target instanceof Element && event.target.closest('.title-bar-controls'))) useWindows.getState().toggleMaximize(record.id)
       }}>
-      <img className="window-icon" src={app.icon} alt="" draggable={false} onError={event => { event.currentTarget.style.visibility = 'hidden' }} />
-      <div className="title-bar-text">{record.title}</div>
+      {!explorer && <img className="window-icon" src={app.icon} alt="" draggable={false} onError={event => { event.currentTarget.style.visibility = 'hidden' }} />}
+      <div className="title-bar-text">{explorer ? '' : title}</div>
       <div className="title-bar-controls">
         <button aria-label="Minimize" onClick={() => useWindows.getState().minimize(record.id)} />
         <button aria-label={record.mode === 'maximized' ? 'Restore' : 'Maximize'} onClick={() => useWindows.getState().toggleMaximize(record.id)} />
         <button aria-label="Close" onClick={() => useWindows.getState().close(record.id)} />
       </div>
     </div>
-    <div className="window-body"><Suspense fallback={<div className="app-loading" role="status" aria-label="Please wait"><Spinner /></div>}><Content /></Suspense></div>
+    <div className="window-body"><Suspense fallback={<div className="app-loading" role="status" aria-label="Please wait"><Spinner /></div>}><Content windowId={record.id} /></Suspense></div>
     {record.mode === 'normal' && edges.map(edge => <div key={edge} className={`resize-edge edge-${edge}`} onPointerDown={event => begin(event, edge)} />)}
   </section>
 }
