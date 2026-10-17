@@ -33,8 +33,8 @@ type WindowStore = {
   finishClose: (id: string) => void
   geometry: (id: string, mode: WindowMode, from?: Rect) => void
   shake: (id: string) => void
-  shakeOwner: string | null
-  shakeIds: string[]
+  shakeGroups: Record<string, string[]>
+  lastShakeAt: number
   setTitle: (id: string, title: string) => void
   setContext: (id: string, context: LaunchContext) => void
   focus: (id: string) => void
@@ -52,7 +52,7 @@ function topVisible(windows: WindowStore['windows'], order: string[]) {
 }
 
 export const useWindows = create<WindowStore>((set, get) => ({
-  windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeOwner: null, shakeIds: [],
+  windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeGroups: {}, lastShakeAt: -Infinity,
   open: (appId, destination, context) => {
     useShellStore.getState().recordLaunch(appId)
     const state = get()
@@ -90,7 +90,8 @@ export const useWindows = create<WindowStore>((set, get) => ({
     delete windows[id]
     useExplorerStore.getState().drop(id)
     const order = state.order.filter(item => item !== id)
-    return { windows, order, activeId: topVisible(windows, order), desktopRestoreIds: state.desktopRestoreIds.filter(item => item !== id) }
+    const shakeGroups = Object.fromEntries(Object.entries(state.shakeGroups).filter(([owner]) => owner !== id).map(([owner, ids]) => [owner, ids.filter(item => item !== id)]))
+    return { windows, order, shakeGroups, activeId: topVisible(windows, order), desktopRestoreIds: state.desktopRestoreIds.filter(item => item !== id) }
   })
   },
   focus: id => set(state => !state.windows[id] || state.windows[id]?.minimized || state.windows[id]?.closing ? state : ({
@@ -120,11 +121,17 @@ export const useWindows = create<WindowStore>((set, get) => ({
   }),
   toggleMaximize: id => { const record = get().windows[id]; if (record) get().geometry(id, record.mode === 'normal' ? 'maximized' : 'normal') },
   shake: id => set(state => {
-    const restore = state.shakeOwner === id && state.shakeIds.length > 0
-    const ids = restore ? state.shakeIds : state.order.filter(other => other !== id && !state.windows[other]?.minimized && !state.windows[other]?.closing)
+    const now = performance.now()
+    if (now - state.lastShakeAt < 1000 || !state.windows[id]) return state
+    const saved = state.shakeGroups[id]
+    const restore = Boolean(saved?.length)
+    const ids = restore ? saved : state.order.filter(other => other !== id && !state.windows[other]?.minimized && !state.windows[other]?.closing)
     const windows = { ...state.windows }
     for (const other of ids) { const record = windows[other]; if (record) windows[other] = { ...record, minimized: !restore, transition: transition(restore ? 'restore' : 'minimize') } }
-    return { windows, shakeOwner: restore ? null : id, shakeIds: restore ? [] : ids, activeId: id }
+    const shakeGroups = { ...state.shakeGroups }
+    if (restore) delete shakeGroups[id]
+    else if (ids.length) shakeGroups[id] = ids
+    return { windows, shakeGroups, lastShakeAt: now, activeId: id }
   }),
   toggleDesktop: () => set(state => {
     const restore = state.desktopRestoreIds.length > 0
@@ -136,5 +143,5 @@ export const useWindows = create<WindowStore>((set, get) => ({
     }
     return { windows, desktopRestoreIds: restore ? [] : ids, activeId: topVisible(windows, state.order) }
   }),
-  reset: () => { closeGuards.clear(); useExplorerStore.setState({ sessions: {}, recent: [] }); set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeOwner: null, shakeIds: [] }) },
+  reset: () => { closeGuards.clear(); useExplorerStore.setState({ sessions: {}, recent: [] }); set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeGroups: {}, lastShakeAt: -Infinity }) },
 }))

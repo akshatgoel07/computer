@@ -20,7 +20,6 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
   const frame = useRef<HTMLElement>(null)
   const gesture = useRef<Gesture | null>(null)
   const raf = useRef(0)
-  const cooldown = useRef(0)
   const draft = useRef<Rect | null>(null)
   const animation = useRef<Animation | null>(null)
   const base = useRef<Rect>(record.normalRect)
@@ -122,7 +121,7 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
         if (drag.direction && direction !== drag.direction) drag.reversals++
         drag.direction = direction
         drag.anchor = event.clientX
-        if (drag.reversals >= 3 && now >= cooldown.current) { useWindows.getState().shake(record.id); cooldown.current = now + 1000; drag.reversals = 0 }
+        if (drag.reversals >= 3) { useWindows.getState().shake(record.id); drag.reversals = 0 }
       }
     }
     cancelAnimationFrame(raf.current)
