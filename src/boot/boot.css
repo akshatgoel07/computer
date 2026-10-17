@@ -12,7 +12,7 @@
   left: calc(50% - 100px);
   top: calc(50% - 128px);
   background-image: var(--boot-activity);
-  background-size: 200px 21000px;
+  background-size: 1400px 3000px;
   background-repeat: no-repeat;
 }
 .boot-title {

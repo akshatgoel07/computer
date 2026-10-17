@@ -20,9 +20,9 @@ Use `performance.now()` for elapsed time. Clear each timer when the component un
 
 The boot text is exactly `Starting Windows`, in Segoe UI, 23px, weight 400, line-height 30px, color `#ffffff`.
 Place `© Microsoft Corporation` at bottom 36px, horizontally centered, 11px/16px, weight 400, color `#aaaaaa`.
-The sprite uses `images.bootActivity`. Its expected sheet is 200 × 21000px, with 105 vertical frames of 200 × 200px.
+The sprite uses `images.bootActivity`. The sheet is 1400 × 3000px: a grid of 7 columns and 15 rows with 105 frames of 200 × 200px in reading order.
 Display each frame at 200 × 200px, without interpolation between frames. Use 15 fps, or 1000/15 ms per frame.
-Set background-size to `200px 21000px`. For frame f, set background-position to `0px calc(-200px * f)`.
+Set background-size to `1400px 3000px`. For frame f, set background-position to `calc(-200px * (f % 7)) calc(-200px * floor(f / 7))`.
 Use zero-based frames 0–59 once, then loop frames 60–104. At 7000 ms, enter Welcome after frame 104.
 If preload extends the black stage, do not advance the sprite clock before decode.
 The [boot updater specification](https://www.coderforlife.com/projects/win7boot/) confirms 105 frames, 200px cells, and 15 fps.
@@ -411,7 +411,7 @@ Do not add Radix, Motion, an icon package, an i18n package, or a theme engine.
 ### Verification and limits
 
 Check the build with `corepack pnpm@11.5.0 build`. Compare the shell at 1366 × 768 and 100% zoom.
-Check sprite dimensions after asset delivery. The expected boot sheet is 200 × 21000px and orb sheet is 54 × 162px.
+Check sprite dimensions after asset delivery. The boot sheet is 1400 × 3000px. The orb sheet is 108 × 324px, shown at 54 × 162px.
 Check active, inactive, maximized, minimized, and restored windows. Check each Start link and each keyboard exit.
 The 7000/2000/500 ms sequence is a fixed demo sequence. Windows boot duration depends on hardware.
 Glass gradients, menu dimensions, spinner bars, and notification vectors need comparison with a Windows 7 screenshot.
