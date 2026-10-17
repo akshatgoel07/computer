@@ -50,6 +50,17 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     window.addEventListener('resize', resize)
     return () => { window.removeEventListener('keydown', key); window.removeEventListener('resize', resize) }
   }, [enabled, modal])
+  useEffect(() => {
+    if (modal || !enabled) return
+    const frame = requestAnimationFrame(() => {
+      const id = useWindows.getState().activeId
+      if (!id) return
+      const owner = document.querySelector<HTMLElement>(`.shell-window[data-window-id="${id}"]`)
+      const target = owner?.querySelector<HTMLElement>('[data-app-focus]') ?? owner
+      target?.focus({ preventScroll: true })
+    })
+    return () => cancelAnimationFrame(frame)
+  }, [modal, enabled])
   const width = preferences.size === 'large' ? 112 : preferences.size === 'small' ? 60 : 76
   const height = preferences.size === 'large' ? 136 : preferences.size === 'small' ? 76 : 100
   const rows = Math.max(1, Math.floor(viewport.height / height))

@@ -18,7 +18,7 @@ export default function Taskbar({ onPeek }: { onPeek: (peek: boolean) => void })
     <StartButton />
     <div className="task-buttons">
       {ids.map(({ id, appId }) => <button key={id} className="shell-button task-button" data-app-id={id}
-        data-running={Boolean(windows[id])} data-active={activeId === id} title={sessions[id] ? locationName(files, sessions[id].location) : apps[appId].title} aria-label={sessions[id] ? locationName(files, sessions[id].location) : apps[appId].title}
+        data-running={Boolean(windows[id])} data-active={activeId === id} title={sessions[id] ? locationName(files, sessions[id].location) : windows[id]?.title ?? apps[appId].title} aria-label={sessions[id] ? locationName(files, sessions[id].location) : windows[id]?.title ?? apps[appId].title}
         onClick={() => {
           const state = useWindows.getState()
           useShellStore.getState().setStart(false)

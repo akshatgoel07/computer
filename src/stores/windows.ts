@@ -3,7 +3,7 @@ import { apps, appSizes, appLocations, type AppId } from '@/lib/apps'
 import { useShellStore } from '@/stores/shellStore'
 import type { Location, NodeId } from '@/fs/types'
 import { useExplorerStore } from '@/stores/explorerStore'
-import { locationName } from '@/fs/paths'
+import { displayName, locationName } from '@/fs/paths'
 import { useFilesStore } from '@/stores/filesStore'
 import { visibleRect, type Rect } from '@/lib/windowGeometry'
 
@@ -61,7 +61,7 @@ export const useWindows = create<WindowStore>((set, get) => ({
     const offset = state.order.length * 24
     const record: WindowRecord = {
       id, appId: location ? 'explorer' : appId,
-      title: location ? locationName(useFilesStore.getState(), location) : apps[appId].title,
+      title: location ? locationName(useFilesStore.getState(), location) : context?.kind === 'file' ? `${useFilesStore.getState().nodes[context.id]?.name ?? 'Untitled'} - Notepad` : context?.kind === 'photo' ? `${useFilesStore.getState().nodes[context.id] ? displayName(useFilesStore.getState().nodes[context.id]) : ''} - Windows Photo Viewer` : appId === 'notepad' ? 'Untitled - Notepad' : apps[appId].title,
       launchContext: location ? { kind: 'explorer', location } : context ?? { kind: 'none' },
       normalRect: visibleRect({ x: 80 + offset, y: 60 + offset, width: size.width, height: size.height }, undefined, { width: size.minWidth, height: size.minHeight }),
       mode: 'normal', minimized: false,

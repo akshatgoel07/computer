@@ -1,5 +1,5 @@
 import { icons, images, media } from '@/assets'
-import { seed, rootId } from '@/fs/seed'
+import { seed, rootId, applyAssetMetadata } from '@/fs/seed'
 import { nodeId, type Location, type Snapshot } from '@/fs/types'
 const key = 'computer.fs.v1'
 export const byteLimit = 2097152
@@ -92,7 +92,7 @@ export function loadSnapshot(): Snapshot {
     raw = localStorage.getItem(key)
     if (raw === null) return seed()
     const value = parseSnapshot(JSON.parse(raw))
-    if (value && new TextEncoder().encode(raw).length <= byteLimit) return value
+    if (value && new TextEncoder().encode(raw).length <= byteLimit) return applyAssetMetadata(value)
   } catch { if (raw === null) writable = false }
   if (raw !== null) {
     try { localStorage.setItem(`computer.fs.recovery.${Date.now()}`, raw) }

@@ -25,6 +25,7 @@ export default function MediaPlayer({ windowId }: { windowId: string }) {
   const [failedCover, setFailedCover] = useState(false)
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[] } | null>(null)
   const audio = useRef<HTMLAudioElement>(null)
+  const generation = useRef(0)
   const wanted = useRef(context?.kind === 'audio' ? context.play : false)
   const node = current ? files.nodes[current] : null
   const payload = node?.kind === 'file' && node.payload.kind === 'audio' ? node.payload : null
@@ -36,18 +37,19 @@ export default function MediaPlayer({ windowId }: { windowId: string }) {
   useEffect(() => {
     const element = audio.current
     if (!element) return
+    const token = ++generation.current
     element.pause(); setElapsed(0); setDuration(0); setPlaying(false); setFailedCover(false)
     if (source) element.src = source
     else element.removeAttribute('src')
     element.load()
-    if (wanted.current && source) void element.play().catch(() => { wanted.current = false; setPlaying(false) })
+    if (wanted.current && source) void element.play().catch(() => { if (token === generation.current) { wanted.current = false; setPlaying(false) } })
   }, [source])
   useEffect(() => { if (audio.current) { audio.current.volume = volume; audio.current.muted = muted } }, [volume, muted])
   useEffect(() => { const element = audio.current; element?.parentElement?.focus(); return () => { if (element) { element.pause(); element.removeAttribute('src'); element.load() } } }, [])
   const toggle = () => {
     const element = audio.current
     if (!element || !source) return
-    if (element.paused) { wanted.current = true; void element.play().catch(() => { wanted.current = false }) }
+    if (element.paused) { const token = generation.current; wanted.current = true; void element.play().catch(() => { if (token === generation.current) wanted.current = false }) }
     else { wanted.current = false; element.pause() }
   }
   const step = (delta: number) => { if (queue.length) { const index = current ? queue.indexOf(current) : -1; setCurrent(queue[(index + delta + queue.length) % queue.length]) } }

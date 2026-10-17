@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { ancestors, inBin, itemsAt, natural, typeName, writableParent } from '@/fs/paths'
 import { type Item } from '@/fs/types'
 import { images } from '@/assets'
-import { blankMenu, itemMenu, sortMenu, viewsMenu } from '@/shell/fileMenus'
+import { blankMenu, itemMenu, newMenu, sortMenu, viewsMenu } from '@/shell/fileMenus'
 import { canPaste, openNode, paste, setClipboard } from '@/lib/fileActions'
 import { useShellStore } from '@/stores/shellStore'
 import { play } from '@/lib/sound'
@@ -130,7 +130,15 @@ export default function Explorer({ windowId }: { windowId: string }) {
     else if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === 'n') { event.preventDefault(); createFolder() }
     else if (event.key === 'F10' && event.shiftKey || event.key === 'ContextMenu') { event.preventDefault(); const rect = panel.current?.querySelector('.file-item[aria-selected=true]')?.getBoundingClientRect() ?? panel.current!.getBoundingClientRect(); context({ preventDefault() {}, clientX: rect.left + 20, clientY: rect.top + 20 } as React.MouseEvent, selected[0]) }
   }}>
-    {menuBar && <div className="explorer-menubar">{['File', 'Edit', 'View', 'Tools', 'Help'].map(label => <button className="shell-button" key={label} disabled>{label}</button>)}</div>}
+    {menuBar && <div className="explorer-menubar">{['File', 'Edit', 'View', 'Tools', 'Help'].map(label => <button className="shell-button" key={label} onClick={event => {
+      const parent = writableParent(session.location)
+      const ids = selected.flatMap(item => item.node ? [item.node.id] : [])
+      const writable = selected.length > 0 && selected.every(item => item.node && !item.node.protected)
+      const separator = { separator: true } as const
+      const entries: MenuEntry[] = label === 'File' ? [{ label: 'New', children: parent ? newMenu(createFolder, createText) : undefined }, { label: 'Open', action: selected.length ? () => selected.forEach(activate) : undefined }, separator, { label: 'Close', action: () => useWindows.getState().close(windowId) }] : label === 'Edit' ? [{ label: 'Cut', action: writable && !bin ? () => setClipboard('cut', ids) : undefined }, { label: 'Copy', action: ids.length && !bin ? () => setClipboard('copy', ids) : undefined }, { label: 'Paste', action: parent && canPaste() ? () => paste(parent) : undefined }, separator, { label: 'Select all', action: () => useExplorerStore.getState().patch(windowId, { selection: items.map(item => item.id) }) }] : label === 'View' ? [...viewsMenu(session.view, view => useExplorerStore.getState().patch(windowId, { view })), separator, { label: 'Details pane', checked: details, action: () => setDetails(!details) }, { label: 'Preview pane', checked: preview, action: () => setPreview(!preview) }, { label: 'Navigation pane', checked: navigation, action: () => setNavigation(!navigation) }, separator, { label: 'Refresh', action: () => useExplorerStore.getState().refresh(windowId) }] : label === 'Tools' ? [{ label: 'Folder and search options' }, { label: 'Map network drive...' }] : [{ label: 'View Help', action: () => useWindows.getState().open('help') }]
+      const rect = event.currentTarget.getBoundingClientRect()
+      setMenu({ x: rect.left, y: rect.bottom, entries })
+    }}>{label}</button>)}</div>}
     <NavigationBar windowId={windowId} session={session} /><CommandBar windowId={windowId} session={session} createFolder={createFolder} preview={preview} setPreview={setPreview} menuBar={menuBar} setMenuBar={setMenuBar} rename={rename} remove={() => remove()} details={details} setDetails={setDetails} navigation={navigation} setNavigation={setNavigation} />
     <div className="explorer-middle">{navigation && <div className="navigation-container" style={{ width: paneWidth }}><NavigationPane windowId={windowId} location={session.location} /><div className="pane-divider" onPointerDown={event => {
       event.currentTarget.setPointerCapture(event.pointerId)

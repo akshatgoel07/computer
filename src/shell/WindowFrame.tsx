@@ -76,7 +76,7 @@ export default function WindowFrame({ record, zIndex, peek }: { record: WindowRe
     display: record.minimized ? 'none' : undefined,
   }
   return <section ref={frame} className={`window glass shell-window${explorer ? ' explorer-window' : ''}${active ? ' active' : ''}${record.mode === 'maximized' ? ' maximized' : ''}`}
-    style={style} role="dialog" aria-label={title} tabIndex={-1} data-peek={peek}
+    style={style} data-window-id={record.id} role="dialog" aria-label={title} tabIndex={-1} data-peek={peek}
     inert={record.minimized} onPointerDown={() => useWindows.getState().focus(record.id)}
     onPointerMove={update} onPointerUp={finish} onPointerCancel={finish} onLostPointerCapture={finish}>
     <div className="title-bar" onPointerDown={event => begin(event, 'move')}

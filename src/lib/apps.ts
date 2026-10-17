@@ -10,7 +10,7 @@ export const apps = {
   explorer: { title: 'Windows Explorer', icon: icons.explorer, component: Explorer },
   internetExplorer: { title: 'Internet Explorer', icon: icons.internetExplorer, component: Placeholder },
   mediaPlayer: { title: 'Windows Media Player', icon: icons.mediaPlayer, component: Media },
-  notepad: { title: 'Untitled - Notepad', icon: icons.notepad, component: Notepad },
+  notepad: { title: 'Notepad', icon: icons.notepad, component: Notepad },
   photos: { title: 'Windows Photo Viewer', icon: icons.photoViewer, component: Photos },
   computer: { title: 'Computer', icon: icons.computer, component: Explorer },
   recycle: { title: 'Recycle Bin', icon: icons.recycleEmpty, component: Explorer },

@@ -54,8 +54,11 @@ export function seed(): Snapshot {
   folder('wallpaper', 'web', 'Wallpaper')
   state.nodes[rootId].icon = 'driveLocal'
   state.nodes[userId].icon = 'userFolder'
+  return applyAssetMetadata(state)
+}
+export function applyAssetMetadata(state: Snapshot): Snapshot {
   for (const node of Object.values(state.nodes)) {
-    if (node.kind === 'file' && (node.payload.kind === 'audio' || node.payload.kind === 'image')) { const entry = metadata[node.payload.key]; if (entry) { node.bytes = entry.bytes; node.modifiedAt = entry.modifiedAt } }
+    if (node.kind === 'file' && (node.payload.kind === 'audio' || node.payload.kind === 'image')) { const entry = metadata[node.payload.key]; if (entry) { if (node.bytes === 0) node.bytes = entry.bytes; if (node.modifiedAt === 0) node.modifiedAt = entry.modifiedAt } }
   }
   return state
 }
