@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { cancelPreviews, duration } from './aero'
 import { images } from '@/assets'
 import { appIds, apps, destinations, pinned, type AppId } from '@/lib/apps'
 import { useShellStore, type PowerAction } from '@/stores/shellStore'
@@ -17,6 +18,7 @@ export default function StartMenu() {
   const input = useRef<HTMLInputElement>(null)
   useEffect(() => {
     if (open) {
+      cancelPreviews()
       setMounted(true)
       setSearch('')
       setAllPrograms(false)
@@ -24,7 +26,7 @@ export default function StartMenu() {
       const timer = setTimeout(() => input.current?.focus(), 0)
       return () => clearTimeout(timer)
     }
-    const timer = setTimeout(() => setMounted(false), 100)
+    const timer = setTimeout(() => setMounted(false), duration(100))
     return () => clearTimeout(timer)
   }, [open])
   useEffect(() => {

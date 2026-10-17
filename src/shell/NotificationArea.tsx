@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
+import { useAero } from './aero'
 import { useWindows } from '@/stores/windows'
 
-export default function NotificationArea({ onPeek }: { onPeek: (peek: boolean) => void }) {
+export default function NotificationArea() {
+  const epoch = useAero(state => state.epoch)
   const [now, setNow] = useState(() => new Date())
   const timer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined)
   useEffect(() => {
@@ -10,7 +12,8 @@ export default function NotificationArea({ onPeek }: { onPeek: (peek: boolean) =
   }, [])
   const time = now.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit', hour12: true })
   const date = `${now.getMonth() + 1}/${now.getDate()}/${now.getFullYear()}`
-  const endPeek = () => { clearTimeout(timer.current); onPeek(false) }
+  const endPeek = () => { clearTimeout(timer.current); useAero.setState({ peek: null }) }
+  useEffect(() => { endPeek() }, [epoch])
   return <>
     <div className="notification-area">
       <button className="shell-button tray-button" title="Show hidden icons" aria-label="Show hidden icons"><span className="tray-arrow" /></button>
@@ -28,7 +31,7 @@ export default function NotificationArea({ onPeek }: { onPeek: (peek: boolean) =
       </div>
     </div>
     <button className="shell-button show-desktop" title="Show desktop" aria-label="Show desktop"
-      onPointerEnter={() => { timer.current = setTimeout(() => onPeek(true), 1000) }}
+      onPointerEnter={() => { timer.current = setTimeout(() => useAero.setState({ peek: 'desktop' }), 1000) }}
       onPointerLeave={endPeek} onClick={() => { endPeek(); useWindows.getState().toggleDesktop() }} />
   </>
 }

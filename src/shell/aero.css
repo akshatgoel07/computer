@@ -1,0 +1,35 @@
+.win7 .shell-window > .window-body,.win7 .shell-window > .title-bar { transition: opacity 150ms linear; }
+.win7 .shell-window[data-peek='true'] > .window-body,.win7 .shell-window[data-peek='true'] > .title-bar { opacity: 0; visibility: visible; pointer-events: none; }
+.win7 .shell-window.window[data-peek='true'] { background: rgba(160,205,235,.10); border: 1px solid rgba(235,248,255,.75); }
+.win7 .shell-window.window[data-peek='true']::before,.win7 .shell-window.window[data-peek='true']::after { display: none; }
+.win7 .shell-window[data-mode='left'],.win7 .shell-window[data-mode='right'] { min-width: 0; }
+.aero-snap-preview { position: fixed; z-index: 1050; pointer-events: none; border: 1px solid #6ba3cf; border-radius: 5px; background: rgba(110,180,235,.25); box-shadow: inset 0 0 0 1px #fff,0 0 8px rgba(170,220,255,.70); }
+.win7 .task-button.shell-button { position: relative; --x: 30px; --y: 20px; --glow: rgba(112,213,255,.8); }
+.win7 .task-button.shell-button:hover { background: linear-gradient(180deg,rgba(255,255,255,.32),rgba(255,255,255,.08) 48%,rgba(0,0,0,.13) 49%,rgba(255,255,255,.14)); }
+.task-button::after { content: ''; position: absolute; inset: 0; pointer-events: none; border-radius: inherit; background: radial-gradient(ellipse 40px 28px at var(--x) var(--y),var(--glow) 0%,rgba(255,255,255,.20) 65%,rgba(255,255,255,0) 100%); opacity: 0; transition: opacity 200ms linear; }
+.task-button:hover::after { opacity: 1; transition-duration: 150ms; }
+.task-button img { position: relative; z-index: 1; }
+.taskbar-previews { position: fixed; bottom: 48px; z-index: 1200; display: flex; max-width: calc(100vw - 16px); overflow: auto; border-radius: 5px; box-shadow: 0 3px 12px #0008; animation: aero-fade 150ms linear; }
+.taskbar-thumbnail { width: 216px; height: 164px; flex: 0 0 216px; padding: 8px; border-radius: 5px; background: linear-gradient(135deg,rgba(194,222,240,.95),rgba(77,132,171,.94)); box-shadow: inset 0 0 0 1px #416985,inset 0 0 0 2px #ffffff80; backdrop-filter: blur(12px); }
+.thumbnail-header { height: 24px; display: flex; align-items: center; gap: 5px; color: #000; font: 12px/16px 'Segoe UI',Tahoma,sans-serif; }
+.thumbnail-header img { width: 16px; height: 16px; }
+.thumbnail-header > span { flex: 1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; }
+.win7 .thumbnail-close.shell-button { width: 18px; height: 18px; min-width: 18px; padding: 0; font: 18px/16px Arial,sans-serif; border-radius: 3px; }
+.win7 .thumbnail-close:hover { background: linear-gradient(#e89586,#ab2710); border: 1px solid #7f2218; color: white; }
+.win7 .thumbnail-target.shell-button { display: block; padding: 0; width: 200px; height: 124px; border: 0; background: #ffffff70; outline-offset: 1px; }
+.thumbnail-view { position: relative; width: 200px; height: 124px; overflow: hidden; pointer-events: none; background: #ffffff70; }
+.thumbnail-view > .window-body { background: white; color: #000; overflow: hidden; margin: 0; padding: 0; }
+.thumbnail-view :disabled { opacity: 1; }
+.aero-tooltip { position: fixed; z-index: 2000; pointer-events: none; max-width: 260px; padding: 3px 5px; background: linear-gradient(180deg,#fff 0%,#e4e5f0 100%); border: 1px solid #767676; border-radius: 2px; box-shadow: 1px 2px 3px rgba(0,0,0,.25); color: #000; font: 12px/16px 'Segoe UI',Tahoma,sans-serif; animation: aero-fade 100ms linear; transition: opacity 100ms linear; }
+.aero-tooltip[data-open='false'] { opacity: 0; animation: none; }
+.win7 .context-panel { background: linear-gradient(90deg,#f0f0f0 0px,#f0f0f0 28px,#e2e3e3 28px,#e2e3e3 29px,#fff 29px,#fff 30px,#f0f0f0 30px); outline: none; animation: aero-fade 150ms linear; }
+.win7 .context-panel > button.shell-button { background: transparent; }
+.win7 .context-panel > button.shell-button:hover:not(:disabled),.win7 .context-panel > button.shell-button:focus-visible { border-color: #aecff7; background: linear-gradient(#f1f7fd,#dceafc); }
+.win7 .start-menu { animation-timing-function: cubic-bezier(0,0,.2,1); }
+.win7 .start-menu[data-open='false'] { transition-timing-function: linear; }
+.win7 .app-loading { cursor: var(--cursor-arrow); }
+.win7 .app-loading[data-busy='true'] { cursor: var(--cursor-busy); }
+@keyframes aero-fade { from { opacity: 0; } to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  .win7 *,.win7 *::before,.win7 *::after { animation-duration: 0ms !important; transition-duration: 0ms !important; }
+}
