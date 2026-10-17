@@ -23,6 +23,14 @@ export const images = {
   wallpaper: '/images/wallpaper/harmony.webp',
   startOrb: '/images/start/orb.webp',
   userTile: '/images/user/flower.webp',
+  sampleChrysanthemum: '/images/samples/Chrysanthemum.jpg',
+  sampleDesert: '/images/samples/Desert.jpg',
+  sampleHydrangeas: '/images/samples/Hydrangeas.jpg',
+  sampleJellyfish: '/images/samples/Jellyfish.jpg',
+  sampleKoala: '/images/samples/Koala.jpg',
+  sampleLighthouse: '/images/samples/Lighthouse.jpg',
+  samplePenguins: '/images/samples/Penguins.jpg',
+  sampleTulips: '/images/samples/Tulips.jpg',
 } as const
 
 export const icons = {
@@ -31,10 +39,60 @@ export const icons = {
   recycleFull: '/icons/recycle-full.webp',
   documents: '/icons/documents.webp',
   roadRash: '/icons/roadrash.webp',
+  folder: '/icons/explorer/folder.webp',
+  folderOpen: '/icons/explorer/folder-open.webp',
+  favorites: '/icons/explorer/favorites.webp',
+  desktop: '/icons/explorer/desktop.webp',
+  downloads: '/icons/explorer/downloads.webp',
+  recentPlaces: '/icons/explorer/recent-places.webp',
+  libraries: '/icons/explorer/libraries.webp',
+  libraryDocuments: '/icons/explorer/library-documents.webp',
+  libraryMusic: '/icons/explorer/library-music.webp',
+  libraryPictures: '/icons/explorer/library-pictures.webp',
+  libraryVideos: '/icons/explorer/library-videos.webp',
+  homegroup: '/icons/explorer/homegroup.webp',
+  network: '/icons/explorer/network.webp',
+  userFolder: '/icons/explorer/user-folder.webp',
+  driveLocal: '/icons/explorer/drive-local.webp',
+  driveDvd: '/icons/explorer/drive-dvd.webp',
+  textFile: '/icons/explorer/text-file.webp',
+  imageFile: '/icons/explorer/image-file.webp',
+  audioFile: '/icons/explorer/audio-file.webp',
+  videoFile: '/icons/explorer/video-file.webp',
+  shortcutOverlay: '/icons/explorer/shortcut-overlay.webp',
+  notepad: '/icons/apps/notepad.webp',
+  photoViewer: '/icons/apps/photo-viewer.webp',
+  mediaPlayer: '/icons/apps/media-player.webp',
+  error: '/icons/explorer/error.webp',
+  refresh: '/icons/explorer/refresh.webp',
+  search: '/icons/explorer/search.webp',
+  chevronRight: '/icons/explorer/chevron-right.webp',
+  check: '/icons/explorer/check.webp',
+  views: '/icons/explorer/views.webp',
+  previewPane: '/icons/explorer/preview-pane.webp',
+  help: '/icons/explorer/help.webp',
 } as const
 
 export const cursors = {
   arrow: '/cursors/arrow.cur',
   link: '/cursors/link.cur',
   busy: '/cursors/busy.cur',
+} as const
+
+export const sprites = {
+  explorerNavigation: '/images/explorer/navigation.webp',
+  explorerViews: '/images/explorer/views.webp',
+  photoControls: '/images/apps/photo-controls.webp',
+  mediaControls: '/images/apps/media-controls.webp',
+} as const
+
+export const fonts = { lucidaConsole: '/fonts/lucida-console.woff2' } as const
+
+export const media = {
+  kalimba: '/media/samples/Kalimba.mp3',
+  maid: '/media/samples/Maid with the Flaxen Hair.mp3',
+  sleepAway: '/media/samples/Sleep Away.mp3',
+  albumKalimba: '/media/samples/album-kalimba.webp',
+  albumMaid: '/media/samples/album-maid.webp',
+  albumSleepAway: '/media/samples/album-sleep-away.webp',
 } as const
