@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import { cancelPreviews } from './aero'
 import { icons } from '@/assets'
 import type { IconKey } from '@/fs/types'
 export type MenuEntry = { label: string; action?: () => void; checked?: boolean; children?: MenuEntry[]; icon?: IconKey } | { separator: true }
@@ -19,7 +20,7 @@ function Panel({ x, y, entries, close, width = 208, back, submenu = false, slide
     const left = submenu && x + rect.width > innerWidth - 2 ? x - rect.width - (element.parentElement?.closest('.context-panel')?.clientWidth ?? 208) + 6 : x
     element.style.left = `${Math.max(2, Math.min(left, innerWidth - rect.width - 2))}px`
     element.style.top = `${Math.max(2, Math.min(y, innerHeight - rect.height - 2))}px`
-    element.querySelector<HTMLButtonElement>(':scope > button:not(:disabled)')?.focus()
+    element.focus({ preventScroll: true })
     return () => clearTimeout(timer.current)
   }, [x, y, width, submenu])
   const reveal = (index: number) => {
@@ -29,13 +30,13 @@ function Panel({ x, y, entries, close, width = 208, back, submenu = false, slide
     const menuRect = panel.current!.getBoundingClientRect()
     setChild({ index, x: menuRect.right - 3, y: rect.top - 3 })
   }
-  return <div ref={panel} className={`explorer-popup context-menu context-panel${slider ? ' views-panel' : ''}`} role="menu" style={{ left: x, top: y }} onContextMenu={event => event.preventDefault()} onKeyDown={event => {
+  return <div ref={panel} className={`explorer-popup context-menu context-panel${slider ? ' views-panel' : ''}`} role="menu" tabIndex={-1} style={{ left: x, top: y }} onContextMenu={event => event.preventDefault()} onKeyDown={event => {
     const buttons = Array.from(panel.current?.querySelectorAll<HTMLButtonElement>(':scope > button:not(:disabled)') ?? [])
     const index = buttons.indexOf(document.activeElement as HTMLButtonElement)
     if (['Escape', 'ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) { event.preventDefault(); event.stopPropagation() }
     if (event.key === 'Escape') close()
     if (event.key === 'ArrowLeft') back?.()
-    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') buttons[(index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus()
+    if (event.key === 'ArrowDown' || event.key === 'ArrowUp') buttons[index < 0 ? (event.key === 'ArrowDown' ? 0 : buttons.length - 1) : (index + (event.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus()
     if (event.key.length === 1 && !event.ctrlKey && !event.metaKey && /[a-z]/i.test(event.key)) { const matching = buttons.find(button => { const entry = entries[Number(button.dataset.menuIndex)]; return entry && 'label' in entry && entry.label[accelerator(entry.label)]?.toLowerCase() === event.key.toLowerCase() }); if (matching) { event.preventDefault(); event.stopPropagation(); matching.click() } }
     if (event.key === 'Home') buttons[0]?.focus()
     if (event.key === 'End') buttons.at(-1)?.focus()
@@ -53,6 +54,7 @@ export default function ContextMenu(props: Props) {
   const close = useRef(props.close)
   close.current = props.close
   useEffect(() => {
+    cancelPreviews()
     const outside = (event: PointerEvent) => { if (event.target instanceof Node && !family.current?.contains(event.target)) close.current() }
     window.addEventListener('pointerdown', outside)
     return () => window.removeEventListener('pointerdown', outside)

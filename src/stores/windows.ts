@@ -1,3 +1,4 @@
+import { transition, type WindowMode, type WindowTransition } from '@/shell/aero'
 import { create } from 'zustand'
 import { apps, appSizes, appLocations, type AppId } from '@/lib/apps'
 import { useShellStore } from '@/stores/shellStore'
@@ -16,7 +17,9 @@ export type WindowRecord = {
   title: string
   launchContext: LaunchContext
   normalRect: Rect
-  mode: 'normal' | 'maximized'
+  mode: WindowMode
+  transition: WindowTransition
+  closing: boolean
   minimized: boolean
 }
 
@@ -27,6 +30,11 @@ type WindowStore = {
   desktopRestoreIds: string[]
   open: (appId: AppId, location?: Location, context?: LaunchContext) => void
   close: (id: string, force?: boolean) => void
+  finishClose: (id: string) => void
+  geometry: (id: string, mode: WindowMode, from?: Rect) => void
+  shake: (id: string) => void
+  shakeGroups: Record<string, string[]>
+  lastShakeAt: number
   setTitle: (id: string, title: string) => void
   setContext: (id: string, context: LaunchContext) => void
   focus: (id: string) => void
@@ -40,11 +48,11 @@ type WindowStore = {
 }
 
 function topVisible(windows: WindowStore['windows'], order: string[]) {
-  return [...order].reverse().find(id => windows[id] && !windows[id]?.minimized) ?? null
+  return [...order].reverse().find(id => windows[id] && !windows[id]?.minimized && !windows[id]?.closing) ?? null
 }
 
 export const useWindows = create<WindowStore>((set, get) => ({
-  windows: {}, order: [], activeId: null, desktopRestoreIds: [],
+  windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeGroups: {}, lastShakeAt: -Infinity,
   open: (appId, destination, context) => {
     useShellStore.getState().recordLaunch(appId)
     const state = get()
@@ -64,58 +72,76 @@ export const useWindows = create<WindowStore>((set, get) => ({
       title: location ? locationName(useFilesStore.getState(), location) : context?.kind === 'file' ? `${useFilesStore.getState().nodes[context.id]?.name ?? 'Untitled'} - Notepad` : context?.kind === 'photo' ? `${useFilesStore.getState().nodes[context.id] ? displayName(useFilesStore.getState().nodes[context.id]) : ''} - Windows Photo Viewer` : appId === 'notepad' ? 'Untitled - Notepad' : apps[appId].title,
       launchContext: location ? { kind: 'explorer', location } : context ?? { kind: 'none' },
       normalRect: visibleRect({ x: 80 + offset, y: 60 + offset, width: size.width, height: size.height }, undefined, { width: size.minWidth, height: size.minHeight }),
-      mode: 'normal', minimized: false,
+      mode: 'normal', minimized: false, closing: false, transition: transition('open'),
     }
     if (location) useExplorerStore.getState().init(id, location)
     set({ windows: { ...state.windows, [id]: record }, order: [...state.order, id], activeId: id, desktopRestoreIds: [] })
   },
   setTitle: (id, title) => set(state => { const record = state.windows[id]; return record && record.title !== title ? { windows: { ...state.windows, [id]: { ...record, title } } } : state }),
-  setContext: (id, launchContext) => set(state => { const record = state.windows[id]; return record ? { windows: { ...state.windows, [id]: { ...record, launchContext } } } : state }),
+  setContext: (id, launchContext) => set(state => { const record = state.windows[id]; return record && !record.closing ? { windows: { ...state.windows, [id]: { ...record, launchContext } } } : state }),
   close: (id, force = false) => {
     if (!force && closeGuards.get(id)?.() === false) return
+    set(state => { const record = state.windows[id]; if (!record || record.closing) return state; const windows = { ...state.windows, [id]: { ...record, closing: true, transition: transition('close') } }; return { windows, activeId: topVisible(windows, state.order) } })
+  },
+  finishClose: id => {
     closeGuards.delete(id)
     set(state => {
     const windows = { ...state.windows }
     delete windows[id]
     useExplorerStore.getState().drop(id)
     const order = state.order.filter(item => item !== id)
-    return { windows, order, activeId: topVisible(windows, order), desktopRestoreIds: state.desktopRestoreIds.filter(item => item !== id) }
+    const shakeGroups = Object.fromEntries(Object.entries(state.shakeGroups).filter(([owner]) => owner !== id).map(([owner, ids]) => [owner, ids.filter(item => item !== id)]))
+    return { windows, order, shakeGroups, activeId: topVisible(windows, order), desktopRestoreIds: state.desktopRestoreIds.filter(item => item !== id) }
   })
   },
-  focus: id => set(state => !state.windows[id] || state.windows[id]?.minimized ? state : ({
+  focus: id => set(state => !state.windows[id] || state.windows[id]?.minimized || state.windows[id]?.closing ? state : ({
     order: [...state.order.filter(item => item !== id), id], activeId: id,
   })),
   minimize: id => set(state => {
     const record = state.windows[id]
-    if (!record) return state
-    const windows = { ...state.windows, [id]: { ...record, minimized: true } }
+    if (!record || record.closing) return state
+    const windows = { ...state.windows, [id]: { ...record, minimized: true, transition: transition('minimize') } }
     return { windows, activeId: topVisible(windows, state.order) }
   }),
   maximize: id => set(state => {
     const record = state.windows[id]
-    return record ? { windows: { ...state.windows, [id]: { ...record, mode: 'maximized', minimized: false } }, activeId: id, order: [...state.order.filter(item => item !== id), id] } : state
+    return record && !record.closing ? { windows: { ...state.windows, [id]: { ...record, mode: 'maximized', minimized: false, transition: transition('geometry') } }, activeId: id, order: [...state.order.filter(item => item !== id), id] } : state
   }),
   restore: id => set(state => {
     const record = state.windows[id]
-    return record ? { windows: { ...state.windows, [id]: { ...record, minimized: false } }, activeId: id, order: [...state.order.filter(item => item !== id), id] } : state
+    return record && !record.closing ? { windows: { ...state.windows, [id]: { ...record, minimized: false, transition: record.minimized ? transition('restore') : record.transition } }, activeId: id, order: [...state.order.filter(item => item !== id), id] } : state
   }),
   move: (id, normalRect) => set(state => {
     const record = state.windows[id]
-    return record ? { windows: { ...state.windows, [id]: { ...record, normalRect: visibleRect(normalRect, undefined, { width: appSizes[record.appId]?.minWidth ?? 320, height: appSizes[record.appId]?.minHeight ?? 200 }) } } } : state
+    return record && !record.closing ? { windows: { ...state.windows, [id]: { ...record, mode: 'normal', normalRect: visibleRect(normalRect, undefined, { width: appSizes[record.appId]?.minWidth ?? 320, height: appSizes[record.appId]?.minHeight ?? 200 }) } } } : state
   }),
-  toggleMaximize: id => set(state => {
+  geometry: (id, mode, from) => set(state => {
     const record = state.windows[id]
-    return record ? { windows: { ...state.windows, [id]: { ...record, mode: record.mode === 'normal' ? 'maximized' : 'normal' } } } : state
+    return record && !record.closing ? { windows: { ...state.windows, [id]: { ...record, mode, transition: transition('geometry', from) } } } : state
+  }),
+  toggleMaximize: id => { const record = get().windows[id]; if (record) get().geometry(id, record.mode === 'normal' ? 'maximized' : 'normal') },
+  shake: id => set(state => {
+    const now = performance.now()
+    if (now - state.lastShakeAt < 1000 || !state.windows[id]) return state
+    const saved = state.shakeGroups[id]
+    const restore = Boolean(saved?.length)
+    const ids = restore ? saved : state.order.filter(other => other !== id && !state.windows[other]?.minimized && !state.windows[other]?.closing)
+    const windows = { ...state.windows }
+    for (const other of ids) { const record = windows[other]; if (record) windows[other] = { ...record, minimized: !restore, transition: transition(restore ? 'restore' : 'minimize') } }
+    const shakeGroups = { ...state.shakeGroups }
+    if (restore) delete shakeGroups[id]
+    else if (ids.length) shakeGroups[id] = ids
+    return { windows, shakeGroups, lastShakeAt: now, activeId: id }
   }),
   toggleDesktop: () => set(state => {
     const restore = state.desktopRestoreIds.length > 0
-    const ids = restore ? state.desktopRestoreIds : state.order.filter(id => !state.windows[id]?.minimized)
+    const ids = restore ? state.desktopRestoreIds : state.order.filter(id => !state.windows[id]?.minimized && !state.windows[id]?.closing)
     const windows = { ...state.windows }
     for (const id of ids) {
       const record = windows[id]
-      if (record) windows[id] = { ...record, minimized: !restore }
+      if (record) windows[id] = { ...record, minimized: !restore, transition: transition(restore ? 'restore' : 'minimize') }
     }
     return { windows, desktopRestoreIds: restore ? [] : ids, activeId: topVisible(windows, state.order) }
   }),
-  reset: () => { closeGuards.clear(); useExplorerStore.setState({ sessions: {}, recent: [] }); set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [] }) },
+  reset: () => { closeGuards.clear(); useExplorerStore.setState({ sessions: {}, recent: [] }); set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [], shakeGroups: {}, lastShakeAt: -Infinity }) },
 }))

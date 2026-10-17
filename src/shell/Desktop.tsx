@@ -16,8 +16,12 @@ import DesktopIcon from './DesktopIcon'
 import WindowFrame from './WindowFrame'
 import Taskbar from './Taskbar'
 import StartMenu from './StartMenu'
+import { cancelPreviews, useAero } from './aero'
+import AeroPreview from './AeroPreview'
+import Tooltip from './Tooltip'
 import './shell.css'
 import '@/apps/explorer/explorer.css'
+import './aero.css'
 export default function Desktop({ enabled }: { enabled: boolean }) {
   const windows = useWindows(state => state.windows)
   const order = useWindows(state => state.order)
@@ -27,7 +31,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
   const localModal = useShellStore(state => state.modalCount > 0)
   const globalModal = useFileDialog(state => Boolean(state.request))
   const modal = globalModal || localModal
-  const [peek, setPeek] = useState(false)
+  const peek = useAero(state => state.peek)
   const [selection, setSelection] = useState<string[]>([])
   const [renameId, setRenameId] = useState<string | null>(null)
   const [menu, setMenu] = useState<{ x: number; y: number; entries: MenuEntry[]; width?: number } | null>(null)
@@ -51,6 +55,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
     return () => { window.removeEventListener('keydown', key); window.removeEventListener('resize', resize) }
   }, [enabled, modal])
   useEffect(() => {
+    if (modal) cancelPreviews()
     if (modal || !enabled) return
     const frame = requestAnimationFrame(() => {
       const id = useWindows.getState().activeId
@@ -208,7 +213,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
         event.currentTarget.setPointerCapture(event.pointerId)
       }} />)}{items.filter(item => draft[item.id]).map(item => <div className="desktop-drag-image" key={`drag-${item.id}`} style={{ left: draft[item.id].x, top: draft[item.id].y, width, height }}><div style={{ width: preferences.size === 'large' ? 96 : preferences.size === 'small' ? 32 : 48, height: preferences.size === 'large' ? 96 : preferences.size === 'small' ? 32 : 48, margin: '8px auto 3px' }}><ItemImage item={item} /></div><span>{item.name}</span></div>)}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}
     </div>
-    {order.map((id, index) => { const record = windows[id]; return record ? <WindowFrame key={id} record={record} zIndex={100 + index} peek={peek} /> : null })}
-    <Taskbar onPeek={setPeek} /><StartMenu />{menu && <ContextMenu {...menu} close={closeMenu} />}
+    {order.map((id, index) => { const record = windows[id]; return record ? <WindowFrame key={id} record={record} zIndex={100 + index} peek={peek !== null && peek !== id} /> : null })}
+    <AeroPreview /><Taskbar /><Tooltip /><StartMenu />{menu && <ContextMenu {...menu} close={closeMenu} />}
   </div><DeleteDialog /></main>
 }

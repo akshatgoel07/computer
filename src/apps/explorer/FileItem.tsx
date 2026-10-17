@@ -28,7 +28,7 @@ export function RenameInput({ item, finish, multiline = false }: { item: Item; f
     else { setInvalid(true); void play('ding'); input.current?.focus(); input.current?.select() }
   }
   const Control = multiline ? 'textarea' : 'input'
-  return <Control className="rename-input" ref={(element: HTMLInputElement | HTMLTextAreaElement | null) => { input.current = element }} aria-label="File name" aria-invalid={invalid} title={invalid ? 'Enter a valid name that differs from other items.' : undefined} value={value} onChange={event => { setValue(event.target.value); setInvalid(false) }} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onBlur={commit} onKeyDown={event => {
+  return <Control className="rename-input" ref={(element: HTMLInputElement | HTMLTextAreaElement | null) => { input.current = element }} aria-label="File name" aria-invalid={invalid} data-tooltip={invalid ? 'Enter a valid name that differs from other items.' : undefined} value={value} onChange={event => { setValue(event.target.value); setInvalid(false) }} onClick={event => event.stopPropagation()} onPointerDown={event => event.stopPropagation()} onBlur={commit} onKeyDown={event => {
     event.stopPropagation()
     if (event.key === 'Enter') { event.preventDefault(); commit() }
     if (event.key === 'Escape') { event.preventDefault(); done.current = true; finish() }
