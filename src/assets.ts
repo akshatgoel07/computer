@@ -38,7 +38,6 @@ export const icons = {
   recycleEmpty: '/icons/recycle-empty.webp',
   recycleFull: '/icons/recycle-full.webp',
   documents: '/icons/documents.webp',
-  roadRash: '/icons/roadrash.webp',
   folder: '/icons/explorer/folder.webp',
   folderOpen: '/icons/explorer/folder-open.webp',
   favorites: '/icons/explorer/favorites.webp',
