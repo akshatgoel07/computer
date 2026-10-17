@@ -1,7 +1,10 @@
 import { useRef, useState, type PointerEvent } from 'react'
 import { typeName } from '@/fs/paths'
-import { type Item } from '@/fs/types'
+import { nodeId, type Item } from '@/fs/types'
 import { type ExplorerSession, useExplorerStore } from '@/stores/explorerStore'
+import { requestDelete, showError } from '@/shell/DeleteDialog'
+import { useShellStore } from '@/stores/shellStore'
+import { writableParent } from '@/fs/paths'
 import { useFilesStore } from '@/stores/filesStore'
 import { ItemImage, RenameInput } from './FileItem'
 const date = (value?: number) => value ? new Date(value).toLocaleString('en-US', { month: 'numeric', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).replace(',', '') : ''
@@ -64,7 +67,19 @@ export default function FileList({ windowId, session, items, renameId, finishRen
     if (column === 'Title') return node.kind === 'file' ? item.name : ''
     return ''
   }
-  return <div ref={list} className={`file-list view-${session.view}`} role="listbox" aria-label="Files" aria-multiselectable="true" data-focused={focused} tabIndex={0} onFocus={() => setFocused(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onContextMenu={event => onContext(event)} onKeyDown={event => {
+  return <div ref={list} className={`file-list view-${session.view}`} role="listbox" aria-label="Files" aria-multiselectable="true" data-focused={focused} tabIndex={0} onFocus={() => setFocused(true)} onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setFocused(false) }} onPointerDown={begin} onPointerMove={move} onPointerUp={end} onPointerCancel={end} onDragOver={event => { if (useShellStore.getState().dragIds.length) event.preventDefault() }} onDrop={event => {
+    const ids = useShellStore.getState().dragIds
+    if (!ids.length) return
+    event.preventDefault()
+    if (bin) requestDelete(ids)
+    else {
+      const element = event.target instanceof Element ? event.target.closest('[data-item-id]') : null
+      const target = items.find(item => item.id === element?.getAttribute('data-item-id'))
+      const parent = target?.node?.kind === 'folder' ? target.node.id : writableParent(session.location)
+      if (parent) { const result = files.commit({ kind: event.ctrlKey ? 'copy' : 'move', ids, parent }); if (!result.ok) showError(result.error) }
+    }
+    useShellStore.getState().setDragIds([])
+  }} onContextMenu={event => onContext(event)} onKeyDown={event => {
     if (event.target instanceof HTMLInputElement) return
     if (event.key === 'Escape') end()
     if (event.ctrlKey && event.key.toLowerCase() === 'a') { event.preventDefault(); event.stopPropagation(); patch(items.map(item => item.id), items[0]?.id ?? null) }
@@ -86,7 +101,14 @@ export default function FileList({ windowId, session, items, renameId, finishRen
     const stop = () => { element.removeEventListener('pointermove', update); element.removeEventListener('pointerup', stop) }
     element.addEventListener('pointermove', update); element.addEventListener('pointerup', stop, { once: true })
   }} /></div>)}</div>}
-  {session.location.kind === 'shell' && session.location.name === 'computer' ? <div className="computer-content">{items.map((item, index) => <div key={item.id}><div className="drive-group"><span>{index === 0 ? 'Hard Disk Drives (1)' : 'Devices with Removable Storage (1)'}</span></div><div className="file-item drive-tile" role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} onClick={event => select(item, event.ctrlKey, event.shiftKey)} onDoubleClick={() => activate(item)}><ItemImage item={item} /><span>{item.name}</span>{index === 0 && <><div className="capacity-bar"><div /></div><small>60.0 GB free of 100 GB</small></>}</div></div>)}</div> : <div className="file-items">{items.map(item => <div key={item.id} className="file-item" role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
+  {session.location.kind === 'shell' && session.location.name === 'computer' ? <div className="computer-content">{items.map((item, index) => <div key={item.id}><div className="drive-group"><span>{index === 0 ? 'Hard Disk Drives (1)' : 'Devices with Removable Storage (1)'}</span></div><div className="file-item drive-tile" role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} onClick={event => select(item, event.ctrlKey, event.shiftKey)} onDoubleClick={() => activate(item)}><ItemImage item={item} /><span>{item.name}</span>{index === 0 && <><div className="capacity-bar"><div /></div><small>60.0 GB free of 100 GB</small></>}</div></div>)}</div> : <div className="file-items">{items.map(item => <div key={item.id} className="file-item" draggable={Boolean(item.node && !item.node.protected && !bin && renameId !== item.id)} onDragStart={event => {
+    if (!item.node || item.node.protected || bin) { event.preventDefault(); return }
+    const ids = (session.selection.includes(item.id) ? session.selection : [item.id]).map(nodeId)
+    if (ids.some(id => !files.nodes[id] || files.nodes[id].protected)) { event.preventDefault(); return }
+    useShellStore.getState().setDragIds(ids)
+    event.dataTransfer.setData('application/x-computer-nodes', JSON.stringify(ids))
+    event.dataTransfer.effectAllowed = 'copyMove'
+  }} onDragEnd={() => useShellStore.getState().setDragIds([])} role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
     <div className="file-name"><ItemImage item={item} large={session.view === 'large'} />{renameId === item.id ? <RenameInput item={item} finish={finishRename} /> : <span>{item.name}</span>}</div>{session.view === 'details' && columns.slice(1).map(([column]) => <span className="file-metadata" key={column}>{metadata(item, column)}</span>)}{session.view === 'tiles' && item.node && <span className="tile-metadata">{typeName(item.node)}{item.node.kind === 'file' && <><br />{size(item.node.bytes)}</>}</span>}
   </div>)}</div>}
   {!items.length && <div className={`empty-folder${session.query ? ' search-empty' : ''}`}>{emptyText}</div>}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}

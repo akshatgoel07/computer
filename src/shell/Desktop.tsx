@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { children, displayName, natural } from '@/fs/paths'
+import { children, displayName, natural, writableParent } from '@/fs/paths'
 import { desktopId } from '@/fs/seed'
 import { nodeId, type Item } from '@/fs/types'
 import { ItemImage } from '@/apps/explorer/FileItem'
 import { play } from '@/lib/sound'
+import { useExplorerStore } from '@/stores/explorerStore'
 import { useWindows } from '@/stores/windows'
 import { useFilesStore } from '@/stores/filesStore'
 import { useShellStore } from '@/stores/shellStore'
@@ -64,7 +65,7 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
   const createFolder = () => {
     const result = files.commit({ kind: 'createFolder', parent: desktopId })
     if (!result.ok) { showError(result.error); return }
-    if (result.value) { setSelection([result.value]); setRenameId(result.value) }
+    if (result.value) { setSelection([result.value]); anchor.current = result.value; setRenameId(result.value) }
   }
   const rename = () => {
     const item = items.find(item => item.id === selection[0])
@@ -101,6 +102,21 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
       grid.current?.focus(); setSelection(event.ctrlKey ? selection : []); useShellStore.getState().setStart(false)
       rubber.current = { x: event.clientX, y: event.clientY, initial: [...selection], ctrl: event.ctrlKey }
       event.currentTarget.setPointerCapture(event.pointerId)
+    }} onDragOver={event => {
+      if (useShellStore.getState().dragIds.length) event.preventDefault()
+    }} onDrop={event => {
+      const ids = useShellStore.getState().dragIds
+      if (!ids.length) return
+      event.preventDefault()
+      const element = event.target instanceof Element ? event.target.closest('[data-item-id]') : null
+      const target = items.find(item => item.id === element?.getAttribute('data-item-id'))
+      if (target?.id === 'recycle') requestDelete(ids)
+      else {
+        const parent = target?.node?.kind === 'folder' ? target.node.id : desktopId
+        const result = files.commit({ kind: event.ctrlKey ? 'copy' : 'move', ids, parent })
+        if (!result.ok) showError(result.error)
+      }
+      useShellStore.getState().setDragIds([])
     }} onPointerMove={event => {
       const start = drag.current
       if (start) {
@@ -122,8 +138,24 @@ export default function Desktop({ enabled }: { enabled: boolean }) {
       if (start?.moved) {
         suppressClick.current = true
         const target = items.find(item => !start.ids.includes(item.id) && event.clientX >= positions[item.id].x && event.clientX < positions[item.id].x + width && event.clientY >= positions[item.id].y && event.clientY < positions[item.id].y + height)
-        if (target?.id === 'recycle') requestDelete(start.ids.flatMap(id => files.nodes[nodeId(id)] ? [nodeId(id)] : []))
-        else {
+        const dropElement = document.elementsFromPoint(event.clientX, event.clientY).find(element => element.closest('.explorer-app'))
+        const explorerElement = dropElement?.closest<HTMLElement>('.explorer-app')
+        const explorerSession = explorerElement?.dataset.windowId ? useExplorerStore.getState().sessions[explorerElement.dataset.windowId] : null
+        if (explorerSession) {
+          const ids = start.ids.map(nodeId)
+          if (explorerSession.location.kind === 'shell' && explorerSession.location.name === 'bin') requestDelete(ids)
+          else {
+            const folderId = dropElement?.closest<HTMLElement>('[data-item-id]')?.dataset.itemId
+            const folder = folderId ? files.nodes[nodeId(folderId)] : null
+            const parent = folder?.kind === 'folder' ? folder.id : writableParent(explorerSession.location)
+            if (parent) { const result = files.commit({ kind: event.ctrlKey ? 'copy' : 'move', ids, parent }); if (!result.ok) showError(result.error) }
+          }
+        } else if (target?.id === 'recycle') requestDelete(start.ids.flatMap(id => files.nodes[nodeId(id)] ? [nodeId(id)] : []))
+        else if (target?.node?.kind === 'folder') {
+          const result = files.commit({ kind: event.ctrlKey ? 'copy' : 'move', ids: start.ids.map(nodeId), parent: target.node.id })
+          if (!result.ok) showError(result.error)
+          else setSelection([target.id])
+        } else {
           const cells = { ...preferences.cells }
           const used = new Set(items.filter(item => !start.ids.includes(item.id)).map(item => `${positions[item.id].x},${positions[item.id].y}`))
           for (const id of start.ids) {

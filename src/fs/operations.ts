@@ -1,7 +1,7 @@
 import { ancestors, inBin, pathFor, validName } from '@/fs/paths'
 import { rootId } from '@/fs/seed'
 import { failure, nodeId, success, type NodeId, type Result, type Snapshot } from '@/fs/types'
-export type Operation = { kind: 'createFolder'; parent: NodeId; name?: string } | { kind: 'rename'; id: NodeId; name: string } | { kind: 'delete'; ids: NodeId[]; permanent: boolean; now: number } | { kind: 'restore'; ids: NodeId[]; conflict: 'fail' | 'keepBoth' } | { kind: 'empty' }
+export type Operation = { kind: 'createFolder'; parent: NodeId; name?: string } | { kind: 'rename'; id: NodeId; name: string } | { kind: 'delete'; ids: NodeId[]; permanent: boolean; now: number } | { kind: 'restore'; ids: NodeId[]; conflict: 'fail' | 'keepBoth' } | { kind: 'empty' } | { kind: 'move' | 'copy'; ids: NodeId[]; parent: NodeId }
 const siblings = (state: Snapshot, parent: NodeId, name: string, except?: NodeId) => Object.values(state.nodes).some(node => node.parentId === parent && node.id !== except && node.name.toLowerCase() === name.toLowerCase())
 export function freeName(state: Snapshot, parent: NodeId, name: string, extension = false) {
   if (!siblings(state, parent, name)) return name
@@ -29,6 +29,32 @@ export function operate(source: Snapshot, operation: Operation): Result<{ snapsh
     const now = Date.now()
     state.nodes[id] = { id, parentId: parent.id, name, kind: 'folder', template: 'general', icon: 'folder', protected: false, hidden: false, createdAt: now, modifiedAt: now }
     return success({ snapshot: state, id })
+  }
+  if (operation.kind === 'move' || operation.kind === 'copy') {
+    const parent = state.nodes[operation.parent]
+    if (!parent || parent.kind !== 'folder' || inBin(state, parent.id)) return failure('missing')
+    const ids = highestRoots(state, operation.ids)
+    const names = new Set<string>()
+    for (const id of ids) {
+      const node = state.nodes[id]
+      if (!node || inBin(state, id)) return failure('missing')
+      if (node.protected) return failure('protected')
+      if (ancestors(state, parent.id).some(ancestor => ancestor.id === id)) return failure('cycle')
+      const name = node.name.toLowerCase()
+      if (names.has(name) || siblings(state, parent.id, node.name, operation.kind === 'move' ? id : undefined)) return failure('duplicate')
+      names.add(name)
+    }
+    if (operation.kind === 'move') for (const id of ids) state.nodes[id].parentId = parent.id
+    else {
+      const descendants = Object.values(source.nodes).filter(node => ancestors(source, node.id).some(ancestor => ids.includes(ancestor.id)))
+      const copies = new Map(descendants.map(node => [node.id, nodeId(crypto.randomUUID())]))
+      for (const node of descendants) {
+        const id = copies.get(node.id)
+        const parentId = ids.includes(node.id) ? parent.id : node.parentId && copies.get(node.parentId)
+        if (!id || !parentId) return failure('missing')
+        state.nodes[id] = { ...node, id, parentId, createdAt: Date.now() }
+      }
+    }
   }
   if (operation.kind === 'rename') {
     const node = state.nodes[operation.id]

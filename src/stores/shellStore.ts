@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { pinned, type AppId } from '@/lib/apps'
+import type { NodeId } from '@/fs/types'
 import { readPreference, savePreference } from '@/fs/storage'
 import { play } from '@/lib/sound'
 
@@ -14,6 +15,8 @@ const validDesktop = (value: unknown): value is DesktopPreferences => {
   return Object.values(value.cells).every(cell => cell && typeof cell === 'object' && 'x' in cell && typeof cell.x === 'number' && Number.isFinite(cell.x) && cell.x >= 0 && 'y' in cell && typeof cell.y === 'number' && Number.isFinite(cell.y) && cell.y >= 0)
 }
 type ShellStore = {
+  dragIds: NodeId[]
+  setDragIds: (ids: NodeId[]) => void
   desktop: DesktopPreferences
   setDesktop: (patch: Partial<DesktopPreferences>) => void
   session: Session
@@ -28,6 +31,7 @@ type ShellStore = {
 }
 
 export const useShellStore = create<ShellStore>((set) => ({
+  dragIds: [], setDragIds: dragIds => set({ dragIds }),
   desktop: readPreference('computer.desktop.v1', initialDesktop, validDesktop),
   setDesktop: patch => set(state => { const desktop = { ...state.desktop, ...patch }; savePreference('computer.desktop.v1', desktop); return { desktop } }),
   session: 'idle', startOpen: false, selectedIcon: null, recent: [],
