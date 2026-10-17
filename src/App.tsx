@@ -1,9 +1,9 @@
-import { useEffect } from 'react'
+import { lazy, Suspense, useEffect } from 'react'
 import { cursors, images } from '@/assets'
 import { unlockAudio } from '@/lib/sound'
 import BootSequence from '@/boot/BootSequence'
 import WelcomeScreen from '@/boot/WelcomeScreen'
-import Desktop from '@/shell/Desktop'
+const Desktop = lazy(() => import('@/shell/Desktop'))
 import { useShellStore } from '@/stores/shellStore'
 import { useWindows } from '@/stores/windows'
 
@@ -36,7 +36,7 @@ export default function App() {
     '--cursor-busy': `url("${cursors.busy}"), wait`,
   }
   return <div className="computer" style={style}>
-    {(session === 'desktop' || session === 'boot' || session === 'welcome' || session === 'locked') && <Desktop enabled={session === 'desktop'} />}
+    {(session === 'desktop' || session === 'boot' || session === 'welcome' || session === 'locked') && <Suspense fallback={null}><Desktop enabled={session === 'desktop'} /></Suspense>}
     {session === 'idle' && <button className="start-screen" onClick={() => { unlockAudio(); setSession('boot') }}>Click to start</button>}
     {(session === 'boot' || session === 'welcome') && <BootSequence key={session} welcomeOnly={session === 'welcome'} />}
     {(session === 'shutdown' || session === 'restart' || session === 'logoff') && <WelcomeScreen text={session === 'logoff' ? 'Logging off...' : 'Shutting down...'} />}
