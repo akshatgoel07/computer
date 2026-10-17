@@ -1,1 +1,23 @@
-/* The assets lane fills this file with @font-face rules for /fonts/*.woff2. */
+@font-face {
+  font-family: "Segoe UI";
+  src: local("Segoe UI"), url("/fonts/segoeui.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Segoe UI";
+  src: local("Segoe UI Semibold"), local("Segoe UI"), url("/fonts/segoeuisb.woff2") format("woff2");
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Segoe UI";
+  src: local("Segoe UI Bold"), local("Segoe UI"), url("/fonts/segoeuib.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
