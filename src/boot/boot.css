@@ -1,0 +1,56 @@
+.boot-preload, .boot-screen, .welcome-screen, .start-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 2000;
+  background: #000;
+}
+.boot-preload, .boot-screen { cursor: none; }
+.boot-sprite {
+  position: absolute;
+  width: 200px;
+  height: 200px;
+  left: calc(50% - 100px);
+  top: calc(50% - 128px);
+  background-image: var(--boot-activity);
+  background-size: 200px 21000px;
+  background-repeat: no-repeat;
+}
+.boot-title {
+  position: absolute;
+  top: calc(50% + 96px);
+  width: 100%;
+  text-align: center;
+  color: #fff;
+  font: 400 23px/30px 'Segoe UI', Tahoma, sans-serif;
+}
+.boot-copyright {
+  position: absolute;
+  bottom: 36px;
+  width: 100%;
+  text-align: center;
+  color: #aaa;
+  font: 400 11px/16px 'Segoe UI', Tahoma, sans-serif;
+}
+.welcome-screen {
+  display: grid;
+  place-items: center;
+  background: var(--logon-background) center center / cover no-repeat #07517f;
+  cursor: var(--cursor-busy);
+  opacity: 1;
+}
+.welcome-screen.reveal { animation: welcome-reveal 500ms ease-out forwards; }
+.welcome-status {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #fff;
+  font: 400 24px/32px 'Segoe UI', Tahoma, sans-serif;
+  text-shadow: 0 2px 4px #00304d;
+}
+.spinner { display: inline-block; width: 24px; height: 24px; position: relative; animation: spinner-turn 1000ms steps(12) infinite; }
+.spinner > span { position: absolute; left: 11px; top: 9px; width: 2px; height: 6px; border-radius: 1px; background: #fff; }
+.start-screen { display: grid; place-items: center; border: 0; padding: 0; width: 100%; color: #888; font: 400 12px/16px 'Segoe UI', Tahoma, sans-serif; cursor: var(--cursor-arrow); }
+.unlock-tile { display: flex; flex-direction: column; align-items: center; gap: 12px; background: transparent; border: 0; color: #fff; font: 400 24px/32px 'Segoe UI', Tahoma, sans-serif; cursor: var(--cursor-arrow); }
+.unlock-tile img { width: 96px; height: 96px; border: 2px solid #dce8ef; border-radius: 5px; background: #58768d; box-shadow: 0 2px 5px #000a; }
+@keyframes spinner-turn { to { transform: rotate(360deg); } }
+@keyframes welcome-reveal { to { opacity: 0; } }
