@@ -1,3 +1,4 @@
+import { media } from '@/assets'
 import { nodeId, type Snapshot, type Template } from '@/fs/types'
 export const rootId = nodeId('c')
 export const userId = nodeId('akshat')
@@ -35,15 +36,19 @@ export function seed(): Snapshot {
   folder('sample-pictures', 'public-pictures', 'Sample Pictures', false, 'pictures')
   folder('sample-music', 'public-music', 'Sample Music', false, 'music')
   folder('sample-videos', 'public-videos', 'Sample Videos', false, 'videos')
-  const pictures = ['Chrysanthemum', 'Desert', 'Hydrangeas', 'Jellyfish', 'Koala', 'Lighthouse', 'Penguins', 'Tulips'] as const
-  for (const name of pictures) {
+  const pictures = [['Chrysanthemum', 'sampleChrysanthemum'], ['Desert', 'sampleDesert'], ['Hydrangeas', 'sampleHydrangeas'], ['Jellyfish', 'sampleJellyfish'], ['Koala', 'sampleKoala'], ['Lighthouse', 'sampleLighthouse'], ['Penguins', 'samplePenguins'], ['Tulips', 'sampleTulips']] as const
+  for (const [name, key] of pictures) {
     const id = nodeId(`picture-${name.toLowerCase()}`)
-    const key = `sample${name}` as 'sampleChrysanthemum'
     state.nodes[id] = { id, parentId: nodeId('sample-pictures'), name: `${name}.jpg`, kind: 'file', bytes: 0, payload: { kind: 'image', key }, icon: 'imageFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
   }
   for (const [name, key] of [['Kalimba', 'kalimba'], ['Maid with the Flaxen Hair', 'maid'], ['Sleep Away', 'sleepAway']] as const) {
     const id = nodeId(`audio-${key}`)
     state.nodes[id] = { id, parentId: nodeId('sample-music'), name: `${name}.mp3`, kind: 'file', bytes: 0, payload: { kind: 'audio', key }, icon: 'audioFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
+  }
+  const wildlife = Object.keys(media).find((key): key is keyof typeof media => key === 'wildlife')
+  if (wildlife) {
+    const id = nodeId('video-wildlife')
+    state.nodes[id] = { id, parentId: nodeId('sample-videos'), name: 'Wildlife.wmv', kind: 'file', bytes: 0, payload: { kind: 'video', key: wildlife }, icon: 'videoFile', createdAt: 0, modifiedAt: 0, protected: false, hidden: false }
   }
   folder('windows', 'c', 'Windows')
   folder('system32', 'windows', 'System32')

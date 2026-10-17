@@ -1,55 +1,66 @@
 import { create } from 'zustand'
-import { apps, type AppId } from '@/lib/apps'
+import { apps, appLocations, type AppId } from '@/lib/apps'
 import { useShellStore } from '@/stores/shellStore'
+import type { Location } from '@/fs/types'
+import { useExplorerStore } from '@/stores/explorerStore'
+import { locationName } from '@/fs/paths'
+import { useFilesStore } from '@/stores/filesStore'
 import { visibleRect, type Rect } from '@/lib/windowGeometry'
 
 export type WindowRecord = {
-  id: AppId
+  id: string
   appId: AppId
   title: string
+  launchContext: { kind: 'explorer'; location: Location } | { kind: 'none' }
   normalRect: Rect
   mode: 'normal' | 'maximized'
   minimized: boolean
 }
 
 type WindowStore = {
-  windows: Partial<Record<AppId, WindowRecord>>
-  order: AppId[]
-  activeId: AppId | null
-  desktopRestoreIds: AppId[]
-  open: (appId: AppId) => void
-  close: (id: AppId) => void
-  focus: (id: AppId) => void
-  minimize: (id: AppId) => void
-  maximize: (id: AppId) => void
-  restore: (id: AppId) => void
-  move: (id: AppId, rect: Rect) => void
-  toggleMaximize: (id: AppId) => void
+  windows: Partial<Record<string, WindowRecord>>
+  order: string[]
+  activeId: string | null
+  desktopRestoreIds: string[]
+  open: (appId: AppId, location?: Location) => void
+  close: (id: string) => void
+  focus: (id: string) => void
+  minimize: (id: string) => void
+  maximize: (id: string) => void
+  restore: (id: string) => void
+  move: (id: string, rect: Rect) => void
+  toggleMaximize: (id: string) => void
   toggleDesktop: () => void
   reset: () => void
 }
 
-function topVisible(windows: WindowStore['windows'], order: AppId[]) {
+function topVisible(windows: WindowStore['windows'], order: string[]) {
   return [...order].reverse().find(id => windows[id] && !windows[id]?.minimized) ?? null
 }
 
 export const useWindows = create<WindowStore>((set, get) => ({
   windows: {}, order: [], activeId: null, desktopRestoreIds: [],
-  open: appId => {
+  open: (appId, destination) => {
     useShellStore.getState().recordLaunch(appId)
     const state = get()
-    if (state.windows[appId]) return state.restore(appId)
+    const location = destination ?? appLocations[appId]
+    if (!location && state.windows[appId]) return state.restore(appId)
+    const id = location ? `explorer-${crypto.randomUUID()}` : appId
     const offset = state.order.length * 24
     const record: WindowRecord = {
-      id: appId, appId, title: apps[appId].title,
+      id, appId: location ? 'explorer' : appId,
+      title: location ? locationName(useFilesStore.getState(), location) : apps[appId].title,
+      launchContext: location ? { kind: 'explorer', location } : { kind: 'none' },
       normalRect: visibleRect({ x: 80 + offset, y: 60 + offset, width: 800, height: 520 }),
       mode: 'normal', minimized: false,
     }
-    set({ windows: { ...state.windows, [appId]: record }, order: [...state.order, appId], activeId: appId, desktopRestoreIds: [] })
+    if (location) useExplorerStore.getState().init(id, location)
+    set({ windows: { ...state.windows, [id]: record }, order: [...state.order, id], activeId: id, desktopRestoreIds: [] })
   },
   close: id => set(state => {
     const windows = { ...state.windows }
     delete windows[id]
+    useExplorerStore.getState().drop(id)
     const order = state.order.filter(item => item !== id)
     return { windows, order, activeId: topVisible(windows, order), desktopRestoreIds: state.desktopRestoreIds.filter(item => item !== id) }
   }),
@@ -88,5 +99,5 @@ export const useWindows = create<WindowStore>((set, get) => ({
     }
     return { windows, desktopRestoreIds: restore ? [] : ids, activeId: topVisible(windows, state.order) }
   }),
-  reset: () => set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [] }),
+  reset: () => { useExplorerStore.setState({ sessions: {}, recent: [] }); set({ windows: {}, order: [], activeId: null, desktopRestoreIds: [] }) },
 }))

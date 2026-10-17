@@ -20,7 +20,7 @@ export function parseSnapshot(value: unknown): Snapshot | null {
   const nodes = candidate.nodes
   const bin = candidate.bin
   for (const [id, node] of Object.entries(nodes)) {
-    if (!object(node) || node.id !== id || typeof node.name !== 'string' || !node.name || typeof node.icon !== 'string' || !(node.icon in icons) || typeof node.protected !== 'boolean' || typeof node.hidden !== 'boolean' || !finite(node.createdAt) || !finite(node.modifiedAt)) return null
+    if (!object(node) || node.id !== id || typeof node.name !== 'string' || !node.name || typeof node.icon !== 'string' || !(Object.hasOwn(icons, node.icon)) || typeof node.protected !== 'boolean' || typeof node.hidden !== 'boolean' || !finite(node.createdAt) || !finite(node.modifiedAt)) return null
     if (node.parentId !== null) {
       if (typeof node.parentId !== 'string') return null
       const parentNode = nodes[node.parentId]
@@ -31,8 +31,8 @@ export function parseSnapshot(value: unknown): Snapshot | null {
       const payload = node.payload
       if (!finite(node.bytes) || !object(payload)) return null
       if (payload.kind === 'text') { if (typeof payload.text !== 'string') return null }
-      else if (payload.kind === 'image') { if (typeof payload.key !== 'string' || !(payload.key in images)) return null }
-      else if (payload.kind === 'audio' || payload.kind === 'video') { if (typeof payload.key !== 'string' || !(payload.key in media)) return null }
+      else if (payload.kind === 'image') { if (typeof payload.key !== 'string' || !(Object.hasOwn(images, payload.key))) return null }
+      else if (payload.kind === 'audio' || payload.kind === 'video') { if (typeof payload.key !== 'string' || !(Object.hasOwn(media, payload.key))) return null }
       else if (payload.kind === 'shortcut') { if (!location(payload.target) || (payload.target.kind === 'folder' && !nodes[payload.target.id])) return null }
       else return null
     } else return null
@@ -53,7 +53,7 @@ export function parseSnapshot(value: unknown): Snapshot | null {
     const binNode = nodes[id]
     if (!object(entry) || entry.id !== id || !object(binNode) || binNode.parentId !== null || binNode.protected || typeof entry.originalParentId !== 'string' || typeof entry.originalLocation !== 'string' || !finite(entry.deletedAt)) return null
     const prior = nodes[entry.originalParentId]
-    if (prior && (!object(prior) || prior.kind !== 'folder')) return null
+    if (prior !== undefined && (!object(prior) || prior.kind !== 'folder')) return null
     const seen = new Set<string>([id])
     let previous: unknown = entry.originalParentId
     while (typeof previous === 'string' && object(bin[previous])) {
@@ -61,6 +61,17 @@ export function parseSnapshot(value: unknown): Snapshot | null {
       seen.add(previous)
       const previousEntry = bin[previous]
       previous = object(previousEntry) ? previousEntry.originalParentId : null
+    }
+  }
+  for (const id of Object.keys(nodes)) {
+    const visited = new Set<string>()
+    let current: unknown = id
+    while (typeof current === 'string' && object(nodes[current])) {
+      if (visited.has(current)) return null
+      visited.add(current)
+      const node = nodes[current]
+      const entry = bin[current]
+      current = object(node) && node.parentId !== null ? node.parentId : object(entry) ? entry.originalParentId : null
     }
   }
   return candidate as Snapshot
@@ -78,7 +89,7 @@ export function loadSnapshot(): Snapshot {
   let raw: string | null = null
   try {
     raw = localStorage.getItem(key)
-    if (!raw) return seed()
+    if (raw === null) return seed()
     const value = parseSnapshot(JSON.parse(raw))
     if (value && new TextEncoder().encode(raw).length <= byteLimit) return value
   } catch { if (raw === null) writable = false }
@@ -95,3 +106,13 @@ export function savePreference(name: string, value: unknown) {
   try { localStorage.setItem(name, JSON.stringify(value)) } catch { return }
 }
 export const storedIds = (values: string[]) => values.map(nodeId)
+
+export const durableStorage = {
+  getItem: (name: string) => {
+    try { const raw = localStorage.getItem(name); return raw && parseSnapshot(JSON.parse(raw)) ? raw : null } catch { return null }
+  },
+  setItem: (name: string, value: string) => {
+    try { if (localStorage.getItem(name) !== value) localStorage.setItem(name, value) } catch { return }
+  },
+  removeItem: (name: string) => { try { localStorage.removeItem(name) } catch { return } },
+}

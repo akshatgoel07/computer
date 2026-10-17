@@ -1,9 +1,10 @@
 import { create } from 'zustand'
+import { createJSONStorage, persist } from 'zustand/middleware'
 import { operate, type Operation } from '@/fs/operations'
-import { loadSnapshot, saveSnapshot } from '@/fs/storage'
+import { durableStorage, loadSnapshot, saveSnapshot } from '@/fs/storage'
 import { failure, success, type NodeId, type Result, type Snapshot } from '@/fs/types'
 type FilesStore = Snapshot & { commit: (operation: Operation) => Result<NodeId | undefined> }
-export const useFilesStore = create<FilesStore>((set, get) => ({
+export const useFilesStore = create<FilesStore>()(persist((set, get) => ({
   ...loadSnapshot(),
   commit: operation => {
     const current = get()
@@ -13,4 +14,4 @@ export const useFilesStore = create<FilesStore>((set, get) => ({
     set(candidate.value.snapshot)
     return success(candidate.value.id)
   },
-}))
+}), { name: 'computer.fs.v1', version: 1, skipHydration: true, storage: createJSONStorage(() => durableStorage), partialize: state => ({ version: state.version, nodes: state.nodes, bin: state.bin }) }))
