@@ -12,6 +12,7 @@ export const size = (bytes: number) => bytes > 0 ? `${Math.ceil(bytes / 1024)} K
 export default function FileList({ windowId, session, items, renameId, finishRename, activate, onContext, emptyText }: { windowId: string; session: ExplorerSession; items: Item[]; renameId: string | null; finishRename: () => void; activate: (item: Item) => void; onContext: (event: React.MouseEvent, item?: Item) => void; emptyText: string }) {
   const files = useFilesStore()
   const list = useRef<HTMLDivElement>(null)
+  const focusedId = useRef<string | null>(null)
   const gesture = useRef<{ x: number; y: number; initial: string[]; ctrl: boolean } | null>(null)
   const [rectangle, setRectangle] = useState<{ x: number; y: number; width: number; height: number } | null>(null)
   const [focused, setFocused] = useState(false)
@@ -85,15 +86,15 @@ export default function FileList({ windowId, session, items, renameId, finishRen
     if (event.ctrlKey && event.key.toLowerCase() === 'a') { event.preventDefault(); event.stopPropagation(); patch(items.map(item => item.id), items[0]?.id ?? null) }
     if (['ArrowDown', 'ArrowUp', 'ArrowLeft', 'ArrowRight'].includes(event.key)) {
       event.preventDefault(); event.stopPropagation()
-      const last = session.selection.at(-1) ?? session.anchor
+      const last = focusedId.current ?? session.selection.at(-1) ?? session.anchor
       const index = items.findIndex(item => item.id === last)
       const count = session.view === 'large' ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / 116)) : session.view === 'tiles' ? Math.max(1, Math.floor((event.currentTarget.clientWidth - 8) / 256)) : 1
       const delta = event.key === 'ArrowUp' ? -count : event.key === 'ArrowDown' ? count : event.key === 'ArrowLeft' ? -1 : 1
       const item = items[Math.max(0, Math.min(items.length - 1, index < 0 ? 0 : index + delta))]
-      if (item) { if (event.ctrlKey) useExplorerStore.getState().patch(windowId, { anchor: item.id }); else select(item, false, event.shiftKey); event.currentTarget.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`)?.scrollIntoView({ block: 'nearest' }) }
+      if (item) { focusedId.current = item.id; if (!event.ctrlKey) select(item, false, event.shiftKey); const element = event.currentTarget.querySelector<HTMLElement>(`[data-item-id="${item.id}"]`); element?.focus({ preventScroll: true }); element?.scrollIntoView({ block: 'nearest' }) }
     }
   }}>
-  {session.view === 'details' && <div className="file-headers" role="row" style={{ gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') }}>{columns.map(([column, width]) => <div className="file-header" key={column}><button className="shell-button" onClick={() => useExplorerStore.getState().patch(windowId, { sort: { field: column, descending: session.sort.field === column && !session.sort.descending } })}>{session.sort.field === column && <span className="sort-arrow">{session.sort.descending ? '▾' : '▴'}</span>}{column}</button><span className="column-resize" onPointerDown={event => {
+  {session.view === 'details' && !(session.query && items.length === 0) && <div className="file-headers" role="row" style={{ gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') }}>{columns.map(([column, width]) => <div className="file-header" key={column}><button className="shell-button" onClick={() => useExplorerStore.getState().patch(windowId, { sort: { field: column, descending: session.sort.field === column && !session.sort.descending } })}>{session.sort.field === column && <span className="sort-arrow">{session.sort.descending ? '▾' : '▴'}</span>}{column}</button><span className="column-resize" onPointerDown={event => {
     event.preventDefault(); event.currentTarget.setPointerCapture(event.pointerId)
     const start = event.clientX; const initial = widths[column] ?? width
     const element = event.currentTarget
@@ -103,12 +104,13 @@ export default function FileList({ windowId, session, items, renameId, finishRen
   }} /></div>)}</div>}
   {session.location.kind === 'shell' && session.location.name === 'computer' ? <div className="computer-content">{items.map((item, index) => <div key={item.id}><div className="drive-group"><span>{index === 0 ? 'Hard Disk Drives (1)' : 'Devices with Removable Storage (1)'}</span></div><div className="file-item drive-tile" role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} onClick={event => select(item, event.ctrlKey, event.shiftKey)} onDoubleClick={() => activate(item)}><ItemImage item={item} /><span>{item.name}</span>{index === 0 && <><div className="capacity-bar"><div /></div><small>60.0 GB free of 100 GB</small></>}</div></div>)}</div> : <div className="file-items">{items.map(item => <div key={item.id} className="file-item" draggable={Boolean(item.node && !item.node.protected && !bin && renameId !== item.id)} onDragStart={event => {
     if (!item.node || item.node.protected || bin) { event.preventDefault(); return }
+    if (!session.selection.includes(item.id)) patch([item.id], item.id)
     const ids = (session.selection.includes(item.id) ? session.selection : [item.id]).map(nodeId)
     if (ids.some(id => !files.nodes[id] || files.nodes[id].protected)) { event.preventDefault(); return }
     useShellStore.getState().setDragIds(ids)
     event.dataTransfer.setData('application/x-computer-nodes', JSON.stringify(ids))
     event.dataTransfer.effectAllowed = 'copyMove'
-  }} onDragEnd={() => useShellStore.getState().setDragIds([])} role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
+  }} onDragEnd={() => useShellStore.getState().setDragIds([])} role="option" aria-label={item.name} tabIndex={-1} aria-selected={session.selection.includes(item.id)} data-item-id={item.id} style={session.view === 'details' ? { gridTemplateColumns: columns.map(([column, width]) => `${widths[column] ?? width}px`).join(' ') } : undefined} onClick={event => { focusedId.current = item.id; list.current?.focus(); select(item, event.ctrlKey || event.metaKey, event.shiftKey) }} onDoubleClick={() => activate(item)} onContextMenu={event => { event.stopPropagation(); if (!session.selection.includes(item.id)) patch([item.id], item.id); onContext(event, item) }}>
     <div className="file-name"><ItemImage item={item} large={session.view === 'large'} />{renameId === item.id ? <RenameInput item={item} finish={finishRename} /> : <span>{item.name}</span>}</div>{session.view === 'details' && columns.slice(1).map(([column]) => <span className="file-metadata" key={column}>{metadata(item, column)}</span>)}{session.view === 'tiles' && item.node && <span className="tile-metadata">{typeName(item.node)}{item.node.kind === 'file' && <><br />{size(item.node.bytes)}</>}</span>}
   </div>)}</div>}
   {!items.length && <div className={`empty-folder${session.query ? ' search-empty' : ''}`}>{emptyText}</div>}{rectangle && <div className="rubber-band" style={{ left: rectangle.x, top: rectangle.y, width: rectangle.width, height: rectangle.height }} />}
