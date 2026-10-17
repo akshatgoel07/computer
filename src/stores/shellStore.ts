@@ -7,14 +7,17 @@ import { play } from '@/lib/sound'
 export type Session = 'idle' | 'boot' | 'desktop' | 'shutdown' | 'restart' | 'logoff' | 'welcome' | 'locked'
 export type PowerAction = 'Switch user' | 'Log off' | 'Lock' | 'Restart' | 'Sleep' | 'Shut down'
 
-type DesktopPreferences = { cells: Record<string, { x: number; y: number }>; size: 'large' | 'medium' | 'small'; align: boolean; auto: boolean; show: boolean; sort: string }
+type DesktopPreferences = { cells: Record<string, { x: number; y: number }>; size: 'large' | 'medium' | 'small'; align: boolean; auto: boolean; show: boolean; sort: string; gadgets?: boolean }
 const initialDesktop: DesktopPreferences = { cells: {}, size: 'medium', align: true, auto: false, show: true, sort: 'Name' }
 const validDesktop = (value: unknown): value is DesktopPreferences => {
   if (!value || typeof value !== 'object' || !('cells' in value) || !value.cells || typeof value.cells !== 'object') return false
   if (!('size' in value) || !['large', 'medium', 'small'].includes(String(value.size)) || !('align' in value) || typeof value.align !== 'boolean' || !('auto' in value) || typeof value.auto !== 'boolean' || !('show' in value) || typeof value.show !== 'boolean' || !('sort' in value) || typeof value.sort !== 'string') return false
+  if ('gadgets' in value && typeof value.gadgets !== 'boolean') return false
   return Object.values(value.cells).every(cell => cell && typeof cell === 'object' && 'x' in cell && typeof cell.x === 'number' && Number.isFinite(cell.x) && cell.x >= 0 && 'y' in cell && typeof cell.y === 'number' && Number.isFinite(cell.y) && cell.y >= 0)
 }
 type ShellStore = {
+  modalCount: number
+  changeModalCount: (delta: number) => void
   clipboard: { kind: 'cut' | 'copy'; ids: NodeId[] } | null
   setClipboard: (clipboard: { kind: 'cut' | 'copy'; ids: NodeId[] } | null) => void
   dragIds: NodeId[]
@@ -33,6 +36,7 @@ type ShellStore = {
 }
 
 export const useShellStore = create<ShellStore>((set) => ({
+  modalCount: 0, changeModalCount: delta => set(state => ({ modalCount: Math.max(0, state.modalCount + delta) })),
   clipboard: null, setClipboard: clipboard => set({ clipboard }),
   dragIds: [], setDragIds: dragIds => set({ dragIds }),
   desktop: readPreference('computer.desktop.v1', initialDesktop, validDesktop),

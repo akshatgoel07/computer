@@ -4,6 +4,7 @@ export const userId = nodeId('akshat')
 export const desktopId = nodeId('akshat-desktop')
 export const libraries = ['documents', 'music', 'pictures', 'videos'] as const
 const metadata: Record<string, { bytes: number; modifiedAt: number }> = {"sampleChrysanthemum":{"bytes":110749,"modifiedAt":1792258450987},"sampleDesert":{"bytes":112735,"modifiedAt":1792258450989},"sampleHydrangeas":{"bytes":82261,"modifiedAt":1792258450992},"sampleJellyfish":{"bytes":55938,"modifiedAt":1792258450993},"sampleKoala":{"bytes":117800,"modifiedAt":1792258450994},"sampleLighthouse":{"bytes":85334,"modifiedAt":1792258450995},"samplePenguins":{"bytes":98933,"modifiedAt":1792258450996},"sampleTulips":{"bytes":79488,"modifiedAt":1792258450997},"kalimba":{"bytes":2785550,"modifiedAt":1792258451017},"maid":{"bytes":1358688,"modifiedAt":1792258451030},"sleepAway":{"bytes":1605349,"modifiedAt":1792258451041}}
+export const audioMetadata: Record<string, { title: string; artist: string; album: string }> = {"kalimba":{"album":"Ninja Tuna","artist":"Mr. Scruff","title":"Kalimba"},"maid":{"album":"Fine Music, Vol. 1","artist":"Richard Stoltzman/Slovak Radio Symphony Orchestra","title":"Maid with the Flaxen Hair"},"sleepAway":{"album":"Bob Acri","artist":"Bob Acri","title":"Sleep Away"}}
 export function seed(): Snapshot {
   const state: Snapshot = { version: 1, nodes: {}, bin: {} }
   const folder = (id: string, parent: string | null, name: string, protect = true, template: Template = 'general') => {
