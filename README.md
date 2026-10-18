@@ -2,7 +2,7 @@
 
 A Windows 7 desktop in the browser. It copies the computer I used as a child, from the boot screen to the last menu.
 
-It will run at [computer.akshatgoel.com](https://computer.akshatgoel.com), a subdomain of [akshatgoel.com](https://akshatgoel.com). The site is not live yet.
+It runs at [computer.akshatgoel.com](https://computer.akshatgoel.com), a subdomain of [akshatgoel.com](https://akshatgoel.com).
 
 ## What it has
 
